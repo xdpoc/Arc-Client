@@ -1,4 +1,4 @@
-local L = (function()
+local Module = (function()
     local S = {
         P = game:GetService("Players"),
         RS = game:GetService("RunService"),
@@ -38,7 +38,7 @@ local L = (function()
         V3 = function(x,y,z) return Vector3.new(x or 0, y or 0, z or 0) end,
         V2 = function(x,y) return Vector2.new(x or 0, y or 0) end,
         CF = function(p,l) return CFrame.lookAt(p or U.V3(), l or U.V3()) end,
-        CL = function(n, l) return math.clamp(n, l or 0, l or 1) end,
+        CL = function(n, l, h) return math.clamp(n, l or 0, h or 1) end,
         R = function(n) return math.rad(n or 0) end,
         D = function(v) return v and v.Magnitude or 0 end,
         L = function(t) return typeof(t) == "Instance" and t or nil end,
@@ -104,11 +104,6 @@ local L = (function()
     local function W2S(p)
         local v, vis = S.C:WorldToViewportPoint(p)
         return U.V2(v.X, v.Y), v.Z, vis
-    end
-    
-    local function W2R(p)
-        local v, vis = S.C:WorldToScreenPoint(p)
-        return U.V2(v.X, v.Y), vis
     end
     
     local function GFD()
@@ -533,7 +528,7 @@ local L = (function()
         if self.SmoothMode == "Exponential" then
             smooth = U.POW(smooth, self.SmoothCurve)
         elseif self.SmoothMode == "Logarithmic" then
-            smooth = U.LOG(smooth + 1, self.SmoothCurve)
+            smooth = math.log(smooth + 1) / math.log(self.SmoothCurve)
         end
         
         return smooth
@@ -651,8 +646,7 @@ local L = (function()
         if not S.UIS.TouchEnabled then return end
         
         local touches = S.UIS:GetTouchInputs()
-        if #touches == 0 then return end
-        
+        if #touches == 0 and self.TriggerMode ~= "Toggle" then return end
         if self.TriggerMode == "Hold" and #touches == 0 then return end
         if self.TriggerMode == "Toggle" and not self.Toggled then return end
         
@@ -845,7 +839,7 @@ local L = (function()
                     if not self.OriginalSizes[head] then
                         self.OriginalSizes[head] = head.Size
                     end
-                    head.Size = head.Size * self.Head * self.Scale
+                    head.Size = self.OriginalSizes[head] * self.Head * self.Scale
                     head.Transparency = self.Transparency
                     head.CanCollide = self.Collision
                     head.Material = self.Material
@@ -859,7 +853,7 @@ local L = (function()
                     if not self.OriginalSizes[torso] then
                         self.OriginalSizes[torso] = torso.Size
                     end
-                    torso.Size = torso.Size * self.Torso * self.Scale
+                    torso.Size = self.OriginalSizes[torso] * self.Torso * self.Scale
                     torso.Transparency = self.Transparency
                     torso.CanCollide = self.Collision
                     torso.Material = self.Material
@@ -869,7 +863,7 @@ local L = (function()
                     if not self.OriginalSizes[leftarm] then
                         self.OriginalSizes[leftarm] = leftarm.Size
                     end
-                    leftarm.Size = leftarm.Size * self.LeftArm * self.Scale
+                    leftarm.Size = self.OriginalSizes[leftarm] * self.LeftArm * self.Scale
                     leftarm.Transparency = self.Transparency
                     leftarm.CanCollide = self.Collision
                     leftarm.Material = self.Material
@@ -879,7 +873,7 @@ local L = (function()
                     if not self.OriginalSizes[rightarm] then
                         self.OriginalSizes[rightarm] = rightarm.Size
                     end
-                    rightarm.Size = rightarm.Size * self.RightArm * self.Scale
+                    rightarm.Size = self.OriginalSizes[rightarm] * self.RightArm * self.Scale
                     rightarm.Transparency = self.Transparency
                     rightarm.CanCollide = self.Collision
                     rightarm.Material = self.Material
@@ -889,7 +883,7 @@ local L = (function()
                     if not self.OriginalSizes[leftleg] then
                         self.OriginalSizes[leftleg] = leftleg.Size
                     end
-                    leftleg.Size = leftleg.Size * self.LeftLeg * self.Scale
+                    leftleg.Size = self.OriginalSizes[leftleg] * self.LeftLeg * self.Scale
                     leftleg.Transparency = self.Transparency
                     leftleg.CanCollide = self.Collision
                     leftleg.Material = self.Material
@@ -899,7 +893,7 @@ local L = (function()
                     if not self.OriginalSizes[rightleg] then
                         self.OriginalSizes[rightleg] = rightleg.Size
                     end
-                    rightleg.Size = rightleg.Size * self.RightLeg * self.Scale
+                    rightleg.Size = self.OriginalSizes[rightleg] * self.RightLeg * self.Scale
                     rightleg.Transparency = self.Transparency
                     rightleg.CanCollide = self.Collision
                     rightleg.Material = self.Material
@@ -1238,7 +1232,7 @@ local L = (function()
         S.RS.RenderStepped:Connect(function()
             if VIZ.FOVCircle then
                 fovCircle.Position = U.V2(S.C.ViewportSize.X/2, S.C.ViewportSize.Y/2)
-                fovCircle.Radius = SIL.FOV or AIM.FOV or 180
+                fovCircle.Radius = VIZ.FOVRadius
                 fovCircle.Color = VIZ.FOVColor
                 fovCircle.Thickness = VIZ.FOVThickness
                 fovCircle.Filled = VIZ.FOVFilled
@@ -1475,10 +1469,6 @@ local L = (function()
         return W2S(p)
     end
     
-    function API.W2R(p)
-        return W2R(p)
-    end
-    
     function API.GetServices()
         return S
     end
@@ -1505,4 +1495,4 @@ local L = (function()
     return API
 end)()
 
-return L
+return Module
