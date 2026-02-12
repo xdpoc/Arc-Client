@@ -1,0 +1,368 @@
+-- DrawingLib.lua
+-- Complete Roblox Drawing Library for Cheats
+
+local DrawingLib = {}
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+-- Cache for drawings
+DrawingLib.Drawings = {}
+DrawingLib.ESPObjects = {}
+DrawingLib.Circles = {}
+DrawingLib.ToggleState = true
+
+-- Color utilities
+DrawingLib.Colors = {
+    White = Color3.fromRGB(255, 255, 255),
+    Red = Color3.fromRGB(255, 0, 0),
+    Green = Color3.fromRGB(0, 255, 0),
+    Blue = Color3.fromRGB(0, 0, 255),
+    Yellow = Color3.fromRGB(255, 255, 0),
+    Purple = Color3.fromRGB(255, 0, 255),
+    Cyan = Color3.fromRGB(0, 255, 255),
+    Orange = Color3.fromRGB(255, 128, 0),
+    Black = Color3.fromRGB(0, 0, 0)
+}
+
+-- Create a new drawing
+function DrawingLib:New(type, properties)
+    local drawing = Drawing.new(type)
+    for prop, value in pairs(properties or {}) do
+        drawing[prop] = value
+    end
+    table.insert(self.Drawings, drawing)
+    return drawing
+end
+
+-- Clear all drawings
+function DrawingLib:ClearDrawings()
+    for _, drawing in ipairs(self.Drawings) do
+        drawing:Remove()
+    end
+    self.Drawings = {}
+    self.ESPObjects = {}
+    self.Circles = {}
+end
+
+-- Create a FOV Circle
+function DrawingLib:CreateFOVCircle(radius, color, thickness, filled, transparency)
+    local circle = self:New("Circle", {
+        Radius = radius,
+        Color = color or self.Colors.Red,
+        Thickness = thickness or 1,
+        Filled = filled or false,
+        Transparency = transparency or 1,
+        Visible = true,
+        Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    })
+    table.insert(self.Circles, circle)
+    return circle
+end
+
+-- Update FOV Circle position (call in renderstepped)
+function DrawingLib:UpdateFOVCircle(circle)
+    if circle and self.ToggleState then
+        circle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+        circle.Visible = true
+    elseif circle then
+        circle.Visible = false
+    end
+end
+
+-- 2D Box ESP
+function DrawingLib:DrawBoxESP(player, color, boxThickness, fillTransparency)
+    if not player or not player.Character or not player.Character:FindFirstChild("Humanoid") or not player.Character:FindFirstChild("HumanoidRootPart") then
+        return
+    end
+    
+    local humanoid = player.Character.Humanoid
+    local root = player.Character.HumanoidRootPart
+    
+    if humanoid.Health <= 0 then return end
+    
+    local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
+    
+    if onScreen then
+        local scale = 1 / (pos.Z * 0.5)
+        local sizeX = math.floor(scale * 30)
+        local sizeY = math.floor(scale * 60)
+        
+        -- Create or get cached drawings
+        if not self.ESPObjects[player] then
+            self.ESPObjects[player] = {}
+            
+            -- Outline
+            self.ESPObjects[player].Outline = self:New("Square", {
+                Thickness = boxThickness + 1,
+                Color = self.Colors.Black,
+                Filled = false,
+                Visible = true
+            })
+            
+            -- Main Box
+            self.ESPObjects[player].Box = self:New("Square", {
+                Thickness = boxThickness,
+                Color = color or self.Colors.Red,
+                Filled = fillTransparency ~= 0,
+                Transparency = fillTransparency or 0.8,
+                Visible = true
+            })
+            
+            -- Name
+            self.ESPObjects[player].Name = self:New("Text", {
+                Text = player.Name,
+                Color = self.Colors.White,
+                Size = 16,
+                Center = true,
+                Outline = true,
+                Visible = true
+            })
+            
+            -- Health
+            self.ESPObjects[player].HealthBG = self:New("Square", {
+                Color = self.Colors.Black,
+                Filled = true,
+                Transparency = 0.5,
+                Visible = true
+            })
+            
+            self.ESPObjects[player].Health = self:New("Square", {
+                Color = self.Colors.Green,
+                Filled = true,
+                Transparency = 0.3,
+                Visible = true
+            })
+            
+            -- Distance
+            self.ESPObjects[player].Distance = self:New("Text", {
+                Text = "",
+                Color = self.Colors.White,
+                Size = 14,
+                Center = true,
+                Outline = true,
+                Visible = true
+            })
+        end
+        
+        -- Update positions
+        local x, y = pos.X, pos.Y
+        local esp = self.ESPObjects[player]
+        
+        -- Box
+        if esp.Box and esp.Outline then
+            esp.Box.Position = Vector2.new(x - sizeX/2, y - sizeY/2)
+            esp.Box.Size = Vector2.new(sizeX, sizeY)
+            esp.Box.Color = color or self.Colors.Red
+            esp.Box.Visible = self.ToggleState
+            
+            esp.Outline.Position = Vector2.new(x - sizeX/2 - 1, y - sizeY/2 - 1)
+            esp.Outline.Size = Vector2.new(sizeX + 2, sizeY + 2)
+            esp.Outline.Visible = self.ToggleState
+        end
+        
+        -- Name
+        if esp.Name then
+            esp.Name.Position = Vector2.new(x, y - sizeY/2 - 20)
+            esp.Name.Text = player.Name
+            esp.Name.Visible = self.ToggleState
+        end
+        
+        -- Health Bar
+        if esp.Health and esp.HealthBG then
+            local healthPercent = humanoid.Health / humanoid.MaxHealth
+            local barHeight = sizeY
+            
+            esp.HealthBG.Position = Vector2.new(x + sizeX/2 + 3, y - sizeY/2)
+            esp.HealthBG.Size = Vector2.new(4, barHeight)
+            esp.HealthBG.Visible = self.ToggleState
+            
+            esp.Health.Position = Vector2.new(x + sizeX/2 + 3, y + sizeY/2 - (barHeight * healthPercent))
+            esp.Health.Size = Vector2.new(4, barHeight * healthPercent)
+            esp.Health.Color = Color3.fromRGB(255 - (255 * healthPercent), 255 * healthPercent, 0)
+            esp.Health.Visible = self.ToggleState
+        end
+        
+        -- Distance
+        if esp.Distance then
+            local dist = math.floor((LocalPlayer.Character.HumanoidRootPart.Position - root.Position).Magnitude)
+            esp.Distance.Position = Vector2.new(x, y + sizeY/2 + 15)
+            esp.Distance.Text = tostring(dist) .. " studs"
+            esp.Distance.Visible = self.ToggleState
+        end
+    else
+        -- Hide if off screen
+        if self.ESPObjects[player] then
+            for _, obj in pairs(self.ESPObjects[player]) do
+                if obj then obj.Visible = false end
+            end
+        end
+    end
+end
+
+-- 3D Box ESP (Corner style)
+function DrawingLib:DrawCornerBoxESP(player, color)
+    if not player or not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+        return
+    end
+    
+    local root = player.Character.HumanoidRootPart
+    local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
+    
+    if onScreen then
+        local scale = 1 / (pos.Z * 0.5)
+        local sizeX = math.floor(scale * 30)
+        local sizeY = math.floor(scale * 60)
+        local x, y = pos.X, pos.Y
+        
+        if not self.ESPObjects[player] then self.ESPObjects[player] = {} end
+        local esp = self.ESPObjects[player]
+        
+        -- Create 4 corners
+        local cornerSize = 5
+        local positions = {
+            -- Top left corner
+            {Vector2.new(x - sizeX/2, y - sizeY/2), Vector2.new(x - sizeX/2 + cornerSize, y - sizeY/2)},
+            {Vector2.new(x - sizeX/2, y - sizeY/2), Vector2.new(x - sizeX/2, y - sizeY/2 + cornerSize)},
+            -- Top right corner
+            {Vector2.new(x + sizeX/2, y - sizeY/2), Vector2.new(x + sizeX/2 - cornerSize, y - sizeY/2)},
+            {Vector2.new(x + sizeX/2, y - sizeY/2), Vector2.new(x + sizeX/2, y - sizeY/2 + cornerSize)},
+            -- Bottom left corner
+            {Vector2.new(x - sizeX/2, y + sizeY/2), Vector2.new(x - sizeX/2 + cornerSize, y + sizeY/2)},
+            {Vector2.new(x - sizeX/2, y + sizeY/2), Vector2.new(x - sizeX/2, y + sizeY/2 - cornerSize)},
+            -- Bottom right corner
+            {Vector2.new(x + sizeX/2, y + sizeY/2), Vector2.new(x + sizeX/2 - cornerSize, y + sizeY/2)},
+            {Vector2.new(x + sizeX/2, y + sizeY/2), Vector2.new(x + sizeX/2, y + sizeY/2 - cornerSize)}
+        }
+        
+        for i, lineData in ipairs(positions) do
+            if not esp["Corner" .. i] then
+                esp["Corner" .. i] = self:New("Line", {
+                    Thickness = 2,
+                    Color = color or self.Colors.White,
+                    Visible = true
+                })
+            end
+            esp["Corner" .. i].From = lineData[1]
+            esp["Corner" .. i].To = lineData[2]
+            esp["Corner" .. i].Visible = self.ToggleState
+        end
+    end
+end
+
+-- Tracer ESP
+function DrawingLib:DrawTracer(player, color, fromCenter)
+    if not player or not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+        return
+    end
+    
+    local root = player.Character.HumanoidRootPart
+    local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
+    
+    if onScreen then
+        if not self.ESPObjects[player] then self.ESPObjects[player] = {} end
+        
+        if not self.ESPObjects[player].Tracer then
+            self.ESPObjects[player].Tracer = self:New("Line", {
+                Thickness = 1,
+                Color = color or self.Colors.Red,
+                Visible = true
+            })
+        end
+        
+        local startPos = fromCenter and Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y) or Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
+        self.ESPObjects[player].Tracer.From = startPos
+        self.ESPObjects[player].Tracer.To = Vector2.new(pos.X, pos.Y)
+        self.ESPObjects[player].Tracer.Visible = self.ToggleState
+    end
+end
+
+-- Head Dot ESP
+function DrawingLib:DrawHeadDot(player, color)
+    if not player or not player.Character or not player.Character:FindFirstChild("Head") then
+        return
+    end
+    
+    local head = player.Character.Head
+    local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
+    
+    if onScreen then
+        if not self.ESPObjects[player] then self.ESPObjects[player] = {} end
+        
+        if not self.ESPObjects[player].HeadDot then
+            self.ESPObjects[player].HeadDot = self:New("Circle", {
+                Radius = 3,
+                Filled = true,
+                Color = color or self.Colors.Red,
+                Thickness = 1,
+                Transparency = 0.5,
+                Visible = true
+            })
+        end
+        
+        self.ESPObjects[player].HeadDot.Position = Vector2.new(pos.X, pos.Y)
+        self.ESPObjects[player].HeadDot.Visible = self.ToggleState
+    end
+end
+
+-- Clean up drawings for removed players
+function DrawingLib:CleanupESP()
+    for player, drawings in pairs(self.ESPObjects) do
+        if not player or not player.Parent then
+            for _, drawing in pairs(drawings) do
+                if drawing then drawing:Remove() end
+            end
+            self.ESPObjects[player] = nil
+        end
+    end
+end
+
+-- Toggle all drawings
+function DrawingLib:Toggle()
+    self.ToggleState = not self.ToggleState
+    for _, drawing in ipairs(self.Drawings) do
+        drawing.Visible = self.ToggleState
+    end
+end
+
+-- Example Usage / Setup
+function DrawingLib:Init()
+    -- Create FOV circle
+    local fovCircle = self:CreateFOVCircle(150, self.Colors.Red, 1, false, 1)
+    
+    -- Main render loop
+    RunService.RenderStepped:Connect(function()
+        if not self.ToggleState then return end
+        
+        -- Update FOV circle
+        self:UpdateFOVCircle(fovCircle)
+        
+        -- Draw ESP for all players
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                self:DrawBoxESP(player, self.Colors.Red, 1, 0.8)
+                self:DrawTracer(player, self.Colors.Red, true)
+                self:DrawHeadDot(player, self.Colors.Yellow)
+            end
+        end
+        
+        -- Cleanup
+        self:CleanupESP()
+    end)
+    
+    -- Toggle on F1 key
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if not gameProcessed and input.KeyCode == Enum.KeyCode.F1 then
+            self:Toggle()
+        end
+    end)
+end
+
+-- Reset all drawings
+function DrawingLib:Reset()
+    self:ClearDrawings()
+end
+
+return DrawingLib
