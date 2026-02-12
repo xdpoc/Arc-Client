@@ -1,483 +1,635 @@
-local S = setmetatable({}, {__index = function(_, k) return game:GetService(k) end})
-S.Players = game:GetService("Players")
-S.RunService = game:GetService("RunService")
-S.Workspace = workspace
-S.Tween = game:GetService("TweenService")
-S.UIS = game:GetService("UserInputService")
-
-local L = S.Players.LocalPlayer
-local C = S.Workspace.CurrentCamera
-
-local D = {}
-local E = {}
-local F = nil
-local G = false
-
-local function C3(r,g,b) return Color3.fromRGB(r,g,b) end
-
-local P = {
-    enemy = C3(255, 70, 70),
-    friend = C3(70, 255, 120),
-    box = C3(255, 255, 255),
-    outline = C3(0, 0, 0),
-    head = C3(255, 220, 40),
-    text = C3(255, 255, 255),
-    distance = C3(200, 200, 200),
-    health_green = C3(70, 255, 70),
-    health_yellow = C3(255, 220, 70),
-    health_red = C3(255, 70, 70),
-    fov = C3(255, 110, 110)
-}
-
-local function safe_draw(t, p)
-    local s, d = pcall(function() return Drawing.new(t) end)
-    if s and d then
-        for k, v in pairs(p or {}) do
-            pcall(function() d[k] = v end)
-        end
-        table.insert(D, d)
-        return d
-    end
-    return nil
-end
-
-local function update_fov()
-    if F and G and C then
-        pcall(function()
-            F.Position = Vector2.new(C.ViewportSize.X/2, C.ViewportSize.Y/2)
-            F.Visible = true
-        end)
-    elseif F then
-        pcall(function() F.Visible = false end)
-    end
-end
-
-local function world_to_viewport(w)
-    local v, vf = C:WorldToViewportPoint(w)
-    return Vector2.new(v.X, v.Y), v.Z, vf
-end
-
-local function cleanup_player(p)
-    if E[p] then
-        for _, d in pairs(E[p]) do
-            if type(d) == "table" then
-                for _, sd in pairs(d) do
-                    pcall(function() sd:Remove() end)
-                end
-            else
-                pcall(function() d:Remove() end)
-            end
-        end
-        E[p] = nil
-    end
-end
-
-local function construct_player_esp(p)
-    if E[p] then return E[p] end
-    
-    local esp = {}
-    
-    esp.box_outline = safe_draw("Square", {
-        Thickness = 2,
-        Color = P.outline,
-        Filled = false,
-        Visible = false
-    })
-    
-    esp.box = safe_draw("Square", {
-        Thickness = 1,
-        Color = P.enemy,
-        Filled = false,
-        Visible = false
-    })
-    
-    for i = 1, 8 do
-        esp["corner_"..i] = safe_draw("Line", {
-            Thickness = 2,
-            Color = P.box,
-            Visible = false
-        })
-    end
-    
-    esp.name = safe_draw("Text", {
-        Text = p.Name,
-        Color = P.text,
-        Size = 16,
-        Center = true,
-        Outline = true,
-        OutlineColor = P.outline,
-        Visible = false
-    })
-    
-    esp.health_bg = safe_draw("Square", {
-        Color = P.outline,
-        Filled = true,
-        Transparency = 0.5,
-        Visible = false
-    })
-    
-    esp.health_fill = safe_draw("Square", {
-        Color = P.health_green,
-        Filled = true,
-        Transparency = 0.2,
-        Visible = false
-    })
-    
-    esp.distance = safe_draw("Text", {
-        Text = "0M",
-        Color = P.distance,
-        Size = 13,
-        Center = true,
-        Outline = true,
-        OutlineColor = P.outline,
-        Visible = false
-    })
-    
-    esp.head = safe_draw("Circle", {
-        Radius = 4,
-        Filled = true,
-        Color = P.head,
-        Transparency = 0.3,
-        Visible = false,
-        NumSides = 16
-    })
-    
-    esp.tracer = safe_draw("Line", {
-        Thickness = 1,
-        Color = P.enemy,
-        Transparency = 0.5,
-        Visible = false
-    })
-    
-    esp.skeleton = {}
-    local bones = {"head", "torso", "leftarm", "rightarm", "leftleg", "rightleg"}
-    for _, bone in ipairs(bones) do
-        if bone == "head" then
-            esp.skeleton[bone] = safe_draw("Circle", {
-                Radius = 3,
-                Filled = true,
-                Color = P.head,
-                Visible = false
-            })
-        elseif bone == "torso" then
-            esp.skeleton[bone] = safe_draw("Square", {
-                Filled = true,
-                Color = P.enemy,
-                Transparency = 0.4,
-                Visible = false
-            })
-        else
-            esp.skeleton[bone] = safe_draw("Line", {
-                Thickness = 2,
-                Color = P.box,
-                Visible = false
-            })
-        end
-    end
-    
-    E[p] = esp
-    return esp
-end
-
-local function update_corners(esp, x, y, w, h)
-    if not esp then return end
-    local corner_len = 8
-    local corners = {
-        esp.corner_1, esp.corner_2, esp.corner_3, esp.corner_4,
-        esp.corner_5, esp.corner_6, esp.corner_7, esp.corner_8
+local VISUAL = (function()
+    local S = {
+        P = game:GetService("Players"),
+        RS = game:GetService("RunService"),
+        UIS = game:GetService("UserInputService"),
+        WS = game:GetService("Workspace"),
+        T = game:GetService("TweenService"),
+        SG = game:GetService("Stats")
     }
-    
-    local positions = {
-        {Vector2.new(x - w/2, y - h/2), Vector2.new(x - w/2 + corner_len, y - h/2)},
-        {Vector2.new(x - w/2, y - h/2), Vector2.new(x - w/2, y - h/2 + corner_len)},
-        {Vector2.new(x + w/2, y - h/2), Vector2.new(x + w/2 - corner_len, y - h/2)},
-        {Vector2.new(x + w/2, y - h/2), Vector2.new(x + w/2, y - h/2 + corner_len)},
-        {Vector2.new(x - w/2, y + h/2), Vector2.new(x - w/2 + corner_len, y + h/2)},
-        {Vector2.new(x - w/2, y + h/2), Vector2.new(x - w/2, y + h/2 - corner_len)},
-        {Vector2.new(x + w/2, y + h/2), Vector2.new(x + w/2 - corner_len, y + h/2)},
-        {Vector2.new(x + w/2, y + h/2), Vector2.new(x + w/2, y + h/2 - corner_len)}
+    S.C = S.WS.CurrentCamera
+    S.LP = S.P.LocalPlayer
+
+    local CACHE = {
+        Drawings = {},
+        ESP = {},
+        FOV = nil,
+        ViewCache = {},
+        SkeletonCache = {},
+        CornerCache = {},
+        Batch = {},
+        Frame = 0,
+        Delta = 0,
+        MemPool = {}
     }
-    
-    for i = 1, 8 do
-        if corners[i] then
-            pcall(function()
-                corners[i].From = positions[i][1]
-                corners[i].To = positions[i][2]
-                corners[i].Visible = G
-            end)
-        end
-    end
-end
 
-local function update_skeleton(p, esp, character)
-    if not character or not esp or not esp.skeleton then return end
-    
-    local hrp = character:FindFirstChild("HumanoidRootPart")
-    local head = character:FindFirstChild("Head")
-    local torso = character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso")
-    local la = character:FindFirstChild("Left Arm") or character:FindFirstChild("LeftHand") or character:FindFirstChild("LeftUpperArm")
-    local ra = character:FindFirstChild("Right Arm") or character:FindFirstChild("RightHand") or character:FindFirstChild("RightUpperArm")
-    local ll = character:FindFirstChild("Left Leg") or character:FindFirstChild("LeftLowerLeg") or character:FindFirstChild("LeftFoot")
-    local rl = character:FindFirstChild("Right Leg") or character:FindFirstChild("RightLowerLeg") or character:FindFirstChild("RightFoot")
-    
-    if not hrp or not head or not torso then return end
-    
-    local hpos, hvis = world_to_viewport(head.Position)
-    local tpos, tvis = world_to_viewport(torso.Position)
-    
-    if hvis and esp.skeleton.head then
-        pcall(function()
-            esp.skeleton.head.Position = Vector2.new(hpos.X, hpos.Y)
-            esp.skeleton.head.Visible = G
-        end)
-    end
-    
-    if tvis and esp.skeleton.torso then
-        pcall(function()
-            local tsize = Vector2.new(30, 40)
-            esp.skeleton.torso.Position = Vector2.new(tpos.X - tsize.X/2, tpos.Y - tsize.Y/2)
-            esp.skeleton.torso.Size = tsize
-            esp.skeleton.torso.Visible = G
-        end)
-    end
-    
-    if la and tvis then
-        local lpos, lvis = world_to_viewport(la.Position)
-        if lvis and esp.skeleton.leftarm then
-            pcall(function()
-                esp.skeleton.leftarm.From = Vector2.new(tpos.X, tpos.Y)
-                esp.skeleton.leftarm.To = Vector2.new(lpos.X, lpos.Y)
-                esp.skeleton.leftarm.Visible = G
-            end)
-        end
-    end
-    
-    if ra and tvis then
-        local rpos, rvis = world_to_viewport(ra.Position)
-        if rvis and esp.skeleton.rightarm then
-            pcall(function()
-                esp.skeleton.rightarm.From = Vector2.new(tpos.X, tpos.Y)
-                esp.skeleton.rightarm.To = Vector2.new(rpos.X, rpos.Y)
-                esp.skeleton.rightarm.Visible = G
-            end)
-        end
-    end
-    
-    if ll and tvis then
-        local llpos, llvis = world_to_viewport(ll.Position)
-        if llvis and esp.skeleton.leftleg then
-            pcall(function()
-                esp.skeleton.leftleg.From = Vector2.new(tpos.X, tpos.Y + 15)
-                esp.skeleton.leftleg.To = Vector2.new(llpos.X, llpos.Y)
-                esp.skeleton.leftleg.Visible = G
-            end)
-        end
-    end
-    
-    if rl and tvis then
-        local rlpos, rlvis = world_to_viewport(rl.Position)
-        if rlvis and esp.skeleton.rightleg then
-            pcall(function()
-                esp.skeleton.rightleg.From = Vector2.new(tpos.X, tpos.Y + 15)
-                esp.skeleton.rightleg.To = Vector2.new(rlpos.X, rlpos.Y)
-                esp.skeleton.rightleg.Visible = G
-            end)
-        end
-    end
-end
+    local U = {
+        V2 = function(x,y) return Vector2.new(x or 0, y or 0) end,
+        V3 = function(x,y,z) return Vector3.new(x or 0, y or 0, z or 0) end,
+        C3 = function(r,g,b) return Color3.fromRGB(r or 255, g or 255, b or 255) end,
+        C4 = function(r,g,b,a) return Color3.fromRGB(r,g,b), a or 1 end,
+        CL = function(n, l, h) return math.clamp(n, l or 0, h or 1) end,
+        HCK = tick,
+        FLR = math.floor,
+        CE = math.ceil,
+        MIN = math.min,
+        MAX = math.max,
+        ABS = math.abs,
+        PI = math.pi
+    }
 
-local function hide_player(p)
-    if E[p] then
-        for _, d in pairs(E[p]) do
-            if type(d) == "table" then
-                for _, sd in pairs(d) do
-                    pcall(function() sd.Visible = false end)
-                end
-            else
-                pcall(function() d.Visible = false end)
-            end
-        end
-    end
-end
+    local PALETTE = {
+        Enemy = U.C3(255, 70, 70),
+        Friend = U.C3(70, 255, 120),
+        Box = U.C3(255, 255, 255),
+        Outline = U.C3(0, 0, 0),
+        Head = U.C3(255, 220, 40),
+        Text = U.C3(255, 255, 255),
+        Distance = U.C3(200, 200, 200),
+        HealthG = U.C3(70, 255, 70),
+        HealthY = U.C3(255, 220, 70),
+        HealthR = U.C3(255, 70, 70),
+        FOV = U.C3(255, 110, 110),
+        Tracer = U.C3(255, 70, 70),
+        Skeleton = U.C3(255, 255, 255),
+        Corner = U.C3(255, 255, 255)
+    }
 
-local function process_player(p)
-    if not G or not p or p == L then return end
-    
-    local c = p.Character
-    if not c then return end
-    
-    local r = c:FindFirstChild("HumanoidRootPart")
-    local h = c:FindFirstChild("Humanoid")
-    
-    if not r or not h or h.Health <= 0 then return end
-    
-    local v2, d3, vf = world_to_viewport(r.Position)
-    if not vf then return end
-    
-    local esp = construct_player_esp(p)
-    if not esp then return end
-    
-    local dist_scale = math.clamp(600 / (d3 + 0.01), 0.6, 2.5)
-    local box_width = math.floor(45 * dist_scale)
-    local box_height = math.floor(90 * dist_scale)
-    local x, y = v2.X, v2.Y
-    
-    local team_color = (p.Team and L.Team and p.Team == L.Team) and P.friend or P.enemy
-    
-    if esp.box and esp.box_outline then
-        pcall(function()
-            esp.box.Position = Vector2.new(x - box_width/2, y - box_height/2)
-            esp.box.Size = Vector2.new(box_width, box_height)
-            esp.box.Color = team_color
-            esp.box.Visible = G
-            
-            esp.box_outline.Position = Vector2.new(x - box_width/2 - 1, y - box_height/2 - 1)
-            esp.box_outline.Size = Vector2.new(box_width + 2, box_height + 2)
-            esp.box_outline.Visible = G
-        end)
-    end
-    
-    update_corners(esp, x, y, box_width, box_height)
-    
-    if esp.health_bg and esp.health_fill then
-        local hp = h.Health
-        local max_hp = h.MaxHealth
-        local percent = hp / max_hp
-        local bar_height = box_height
-        local bar_width = 5
-        
-        local health_color = percent > 0.6 and P.health_green or percent > 0.3 and P.health_yellow or P.health_red
-        
-        pcall(function()
-            esp.health_bg.Position = Vector2.new(x + box_width/2 + 5, y - box_height/2)
-            esp.health_bg.Size = Vector2.new(bar_width, bar_height)
-            esp.health_bg.Visible = G
-            
-            esp.health_fill.Position = Vector2.new(x + box_width/2 + 5, y + box_height/2 - (bar_height * percent))
-            esp.health_fill.Size = Vector2.new(bar_width, bar_height * percent)
-            esp.health_fill.Color = health_color
-            esp.health_fill.Visible = G
-        end)
-    end
-    
-    if esp.name then
-        pcall(function()
-            esp.name.Position = Vector2.new(x, y - box_height/2 - 22)
-            esp.name.Text = string.upper(p.Name)
-            esp.name.Visible = G
-        end)
-    end
-    
-    if esp.distance and L.Character and L.Character:FindFirstChild("HumanoidRootPart") then
-        local lr = L.Character.HumanoidRootPart
-        local dist = math.floor((lr.Position - r.Position).Magnitude)
-        pcall(function()
-            esp.distance.Position = Vector2.new(x, y + box_height/2 + 20)
-            esp.distance.Text = tostring(dist) .. " M"
-            esp.distance.Visible = G
-        end)
-    end
-    
-    if esp.head and c:FindFirstChild("Head") then
-        local head = c.Head
-        local hpos, hvis = world_to_viewport(head.Position)
-        if hvis then
-            pcall(function()
-                esp.head.Position = Vector2.new(hpos.X, hpos.Y)
-                esp.head.Visible = G
-            end)
-        end
-    end
-    
-    if esp.tracer and C then
-        pcall(function()
-            esp.tracer.From = Vector2.new(C.ViewportSize.X/2, C.ViewportSize.Y)
-            esp.tracer.To = Vector2.new(x, y - box_height/3)
-            esp.tracer.Color = team_color
-            esp.tracer.Visible = G
-        end)
-    end
-    
-    update_skeleton(p, esp, c)
-end
-
-local function cleanup()
-    for p, _ in pairs(E) do
-        if not p or not p.Parent then
-            cleanup_player(p)
-        end
-    end
-end
-
-local function full_reset()
-    for _, d in pairs(D) do
-        pcall(function() d:Remove() end)
-    end
-    D = {}
-    E = {}
-    if F then pcall(function() F:Remove() end) F = nil end
-end
-
-local M = {}
-
-function M.Enable()
-    G = true
-    if not F then
-        F = safe_draw("Circle", {
+    local CFG = {
+        Enabled = false,
+        FOV = {
             Radius = 120,
-            Color = P.fov,
+            Color = PALETTE.FOV,
             Thickness = 1.25,
-            NumSides = 72,
+            Sides = 72,
             Filled = false,
-            Transparency = 0.85,
-            Visible = true,
-            Position = C and Vector2.new(C.ViewportSize.X/2, C.ViewportSize.Y/2) or Vector2.new(960, 540)
-        })
+            Transparency = 0.85
+        },
+        Box = {
+            Style = "2D",
+            Thickness = 1,
+            Outline = true,
+            OutlineThickness = 2,
+            BaseWidth = 55,
+            BaseHeight = 110,
+            ScaleFactor = 750,
+            ScaleMin = 0.6,
+            ScaleMax = 2.5,
+            TeamColor = true,
+            HealthBar = true,
+            HealthBarWidth = 5,
+            NameTag = true,
+            NameSize = 16,
+            Distance = true,
+            DistanceSize = 13
+        },
+        Corner = {
+            Enabled = false,
+            Length = 8,
+            Thickness = 2,
+            Color = PALETTE.Corner
+        },
+        Tracer = {
+            Enabled = false,
+            Mode = "Bottom",
+            Thickness = 1,
+            Color = PALETTE.Tracer,
+            TeamColor = true
+        },
+        Head = {
+            Enabled = false,
+            Radius = 4,
+            Filled = true,
+            Color = PALETTE.Head,
+            Transparency = 0.3
+        },
+        Skeleton = {
+            Enabled = false,
+            Thickness = 2,
+            Color = PALETTE.Skeleton,
+            Transparency = 0.2
+        }
+    }
+
+    local function SD(t, p)
+        local s, d = pcall(function() return Drawing.new(t) end)
+        if s and d then
+            for k, v in pairs(p or {}) do
+                pcall(function() d[k] = v end)
+            end
+            table.insert(CACHE.Drawings, d)
+            return d
+        end
+        return nil
     end
-end
 
-function M.Disable()
-    G = false
-    if F then pcall(function() F.Visible = false end) end
-    for p, _ in pairs(E) do
-        hide_player(p)
+    local function W2S(w)
+        if not S.C then return U.V2(), 0, false end
+        local v, vf = S.C:WorldToViewportPoint(w)
+        return U.V2(v.X, v.Y), v.Z, vf
     end
-end
 
-function M.Toggle()
-    if G then M.Disable() else M.Enable() end
-end
-
-function M.SetFOVRadius(r)
-    if F then
-        pcall(function() F.Radius = r end)
+    local function GVC()
+        return U.V2(S.C.ViewportSize.X/2, S.C.ViewportSize.Y/2)
     end
-end
 
-function M.Reset()
-    full_reset()
-end
+    local function GVD()
+        return U.V2(S.C.ViewportSize.X, S.C.ViewportSize.Y)
+    end
 
-function M.IsEnabled()
-    return G
-end
+    local function V(p)
+        local s, e = pcall(function()
+            return p and p.Parent and S.P:FindFirstChild(p.Parent.Name) and
+                   p.Parent:FindFirstChild("Humanoid") and
+                   p.Parent.Humanoid.Health > 0 and
+                   p.Parent:FindFirstChild("HumanoidRootPart")
+        end)
+        return s and e
+    end
 
-S.RunService.RenderStepped:Connect(function()
-    if not C then C = S.Workspace.CurrentCamera end
-    if not C then return end
-    
-    update_fov()
-    
-    if G then
-        for _, p in pairs(S.Players:GetPlayers()) do
-            if p ~= L then
-                process_player(p)
+    local function GHR(p)
+        if not p then return nil end
+        local r = p.Character and p.Character:FindFirstChild("HumanoidRootPart")
+        return r
+    end
+
+    local function GP(c, n)
+        if not c then return nil end
+        return c:FindFirstChild(n) or c:FindFirstChild("HumanoidRootPart")
+    end
+
+    local function CESP(p)
+        if CACHE.ESP[p] then return CACHE.ESP[p] end
+        
+        local e = {}
+        
+        e.BoxO = SD("Square", {Thickness = CFG.Box.OutlineThickness, Color = PALETTE.Outline, Filled = false, Visible = false})
+        e.Box = SD("Square", {Thickness = CFG.Box.Thickness, Color = PALETTE.Enemy, Filled = false, Visible = false})
+        
+        if CFG.Corner.Enabled then
+            for i = 1, 8 do
+                e["C"..i] = SD("Line", {Thickness = CFG.Corner.Thickness, Color = CFG.Corner.Color, Visible = false})
             end
         end
-        cleanup()
+        
+        if CFG.Box.NameTag then
+            e.Name = SD("Text", {
+                Text = p.Name,
+                Color = PALETTE.Text,
+                Size = CFG.Box.NameSize,
+                Center = true,
+                Outline = true,
+                OutlineColor = PALETTE.Outline,
+                Visible = false
+            })
+        end
+        
+        if CFG.Box.HealthBar then
+            e.HBG = SD("Square", {Color = PALETTE.Outline, Filled = true, Transparency = 0.5, Visible = false})
+            e.HBF = SD("Square", {Color = PALETTE.HealthG, Filled = true, Transparency = 0.2, Visible = false})
+        end
+        
+        if CFG.Box.Distance then
+            e.Dist = SD("Text", {
+                Text = "0M",
+                Color = PALETTE.Distance,
+                Size = CFG.Box.DistanceSize,
+                Center = true,
+                Outline = true,
+                OutlineColor = PALETTE.Outline,
+                Visible = false
+            })
+        end
+        
+        if CFG.Head.Enabled then
+            e.Head = SD("Circle", {
+                Radius = CFG.Head.Radius,
+                Filled = CFG.Head.Filled,
+                Color = CFG.Head.Color,
+                Transparency = CFG.Head.Transparency,
+                Visible = false,
+                NumSides = 16
+            })
+        end
+        
+        if CFG.Tracer.Enabled then
+            e.Tracer = SD("Line", {
+                Thickness = CFG.Tracer.Thickness,
+                Color = CFG.Tracer.Color,
+                Visible = false
+            })
+        end
+        
+        if CFG.Skeleton.Enabled then
+            e.Skeleton = {}
+            local bones = {"Head", "Torso", "LeftArm", "RightArm", "LeftLeg", "RightLeg"}
+            for _, bone in ipairs(bones) do
+                if bone == "Head" then
+                    e.Skeleton[bone] = SD("Circle", {Radius = 3, Filled = true, Color = PALETTE.Head, Visible = false})
+                elseif bone == "Torso" then
+                    e.Skeleton[bone] = SD("Square", {Filled = true, Color = CFG.Skeleton.Color, Transparency = CFG.Skeleton.Transparency, Visible = false})
+                else
+                    e.Skeleton[bone] = SD("Line", {Thickness = CFG.Skeleton.Thickness, Color = CFG.Skeleton.Color, Transparency = CFG.Skeleton.Transparency, Visible = false})
+                end
+            end
+        end
+        
+        CACHE.ESP[p] = e
+        return e
     end
-end)
 
-_G.VISUALS = M
+    local function UCORNERS(e, x, y, w, h)
+        if not e or not CFG.Corner.Enabled then return end
+        local l = CFG.Corner.Length
+        local ps = {
+            {U.V2(x - w/2, y - h/2), U.V2(x - w/2 + l, y - h/2)},
+            {U.V2(x - w/2, y - h/2), U.V2(x - w/2, y - h/2 + l)},
+            {U.V2(x + w/2, y - h/2), U.V2(x + w/2 - l, y - h/2)},
+            {U.V2(x + w/2, y - h/2), U.V2(x + w/2, y - h/2 + l)},
+            {U.V2(x - w/2, y + h/2), U.V2(x - w/2 + l, y + h/2)},
+            {U.V2(x - w/2, y + h/2), U.V2(x - w/2, y + h/2 - l)},
+            {U.V2(x + w/2, y + h/2), U.V2(x + w/2 - l, y + h/2)},
+            {U.V2(x + w/2, y + h/2), U.V2(x + w/2, y + h/2 - l)}
+        }
+        for i = 1, 8 do
+            if e["C"..i] then
+                pcall(function()
+                    e["C"..i].From = ps[i][1]
+                    e["C"..i].To = ps[i][2]
+                    e["C"..i].Visible = CFG.Enabled
+                end)
+            end
+        end
+    end
 
-return M
+    local function USKELETON(p, e, c)
+        if not c or not e.Skeleton or not CFG.Skeleton.Enabled then return end
+        
+        local head = c:FindFirstChild("Head")
+        local torso = c:FindFirstChild("Torso") or c:FindFirstChild("UpperTorso")
+        local la = c:FindFirstChild("Left Arm") or c:FindFirstChild("LeftHand") or c:FindFirstChild("LeftUpperArm")
+        local ra = c:FindFirstChild("Right Arm") or c:FindFirstChild("RightHand") or c:FindFirstChild("RightUpperArm")
+        local ll = c:FindFirstChild("Left Leg") or c:FindFirstChild("LeftLowerLeg") or c:FindFirstChild("LeftFoot")
+        local rl = c:FindFirstChild("Right Leg") or c:FindFirstChild("RightLowerLeg") or c:FindFirstChild("RightFoot")
+        
+        if head and e.Skeleton.Head then
+            local pos, _, vis = W2S(head.Position)
+            if vis then
+                pcall(function()
+                    e.Skeleton.Head.Position = U.V2(pos.X, pos.Y)
+                    e.Skeleton.Head.Visible = CFG.Enabled
+                end)
+            end
+        end
+        
+        if torso and e.Skeleton.Torso then
+            local pos, _, vis = W2S(torso.Position)
+            if vis then
+                pcall(function()
+                    local size = U.V2(30, 40)
+                    e.Skeleton.Torso.Position = U.V2(pos.X - size.X/2, pos.Y - size.Y/2)
+                    e.Skeleton.Torso.Size = size
+                    e.Skeleton.Torso.Visible = CFG.Enabled
+                end)
+            end
+        end
+        
+        if la and e.Skeleton.LeftArm and torso then
+            local lpos, lvis = W2S(la.Position)
+            local tpos, tvis = W2S(torso.Position)
+            if lvis and tvis then
+                pcall(function()
+                    e.Skeleton.LeftArm.From = U.V2(tpos.X, tpos.Y)
+                    e.Skeleton.LeftArm.To = U.V2(lpos.X, lpos.Y)
+                    e.Skeleton.LeftArm.Visible = CFG.Enabled
+                end)
+            end
+        end
+        
+        if ra and e.Skeleton.RightArm and torso then
+            local rpos, rvis = W2S(ra.Position)
+            local tpos, tvis = W2S(torso.Position)
+            if rvis and tvis then
+                pcall(function()
+                    e.Skeleton.RightArm.From = U.V2(tpos.X, tpos.Y)
+                    e.Skeleton.RightArm.To = U.V2(rpos.X, rpos.Y)
+                    e.Skeleton.RightArm.Visible = CFG.Enabled
+                end)
+            end
+        end
+        
+        if ll and e.Skeleton.LeftLeg and torso then
+            local llpos, llvis = W2S(ll.Position)
+            local tpos, tvis = W2S(torso.Position)
+            if llvis and tvis then
+                pcall(function()
+                    e.Skeleton.LeftLeg.From = U.V2(tpos.X, tpos.Y + 15)
+                    e.Skeleton.LeftLeg.To = U.V2(llpos.X, llpos.Y)
+                    e.Skeleton.LeftLeg.Visible = CFG.Enabled
+                end)
+            end
+        end
+        
+        if rl and e.Skeleton.RightLeg and torso then
+            local rlpos, rlvis = W2S(rl.Position)
+            local tpos, tvis = W2S(torso.Position)
+            if rlvis and tvis then
+                pcall(function()
+                    e.Skeleton.RightLeg.From = U.V2(tpos.X, tpos.Y + 15)
+                    e.Skeleton.RightLeg.To = U.V2(rlpos.X, rlpos.Y)
+                    e.Skeleton.RightLeg.Visible = CFG.Enabled
+                end)
+            end
+        end
+    end
+
+    local function PROCESS(p)
+        if not CFG.Enabled or not p or p == S.LP then return end
+        if not V(p) then
+            if CACHE.ESP[p] then
+                for _, d in pairs(CACHE.ESP[p]) do
+                    if type(d) == "table" then
+                        for _, sd in pairs(d) do pcall(function() sd.Visible = false end) end
+                    else
+                        pcall(function() d.Visible = false end)
+                    end
+                end
+            end
+            return
+        end
+        
+        local c = p.Character
+        local r = GHR(p)
+        local h = c and c:FindFirstChild("Humanoid")
+        if not r or not h then return end
+        
+        local v2, d3, vf = W2S(r.Position)
+        if not vf then return end
+        
+        local e = CESP(p)
+        local scale = U.CL(CFG.Box.ScaleFactor / (d3 + 0.01), CFG.Box.ScaleMin, CFG.Box.ScaleMax)
+        local bw = U.FLR(CFG.Box.BaseWidth * scale)
+        local bh = U.FLR(CFG.Box.BaseHeight * scale)
+        local x, y = v2.X, v2.Y
+        
+        local tc = p.Team and S.LP.Team and p.Team == S.LP.Team
+        local bc = tc and PALETTE.Friend or PALETTE.Enemy
+        
+        if e.Box and e.BoxO then
+            pcall(function()
+                e.Box.Position = U.V2(x - bw/2, y - bh/2)
+                e.Box.Size = U.V2(bw, bh)
+                e.Box.Color = bc
+                e.Box.Visible = CFG.Enabled
+                
+                e.BoxO.Position = U.V2(x - bw/2 - 1, y - bh/2 - 1)
+                e.BoxO.Size = U.V2(bw + 2, bh + 2)
+                e.BoxO.Visible = CFG.Enabled
+            end)
+        end
+        
+        if CFG.Corner.Enabled then
+            UCORNERS(e, x, y, bw, bh)
+        end
+        
+        if e.HBG and e.HBF then
+            local hp = h.Health
+            local mhp = h.MaxHealth
+            local pct = hp / mhp
+            local hc = pct > 0.6 and PALETTE.HealthG or pct > 0.3 and PALETTE.HealthY or PALETTE.HealthR
+            local bwid = CFG.Box.HealthBarWidth
+            
+            pcall(function()
+                e.HBG.Position = U.V2(x + bw/2 + 4, y - bh/2)
+                e.HBG.Size = U.V2(bwid, bh)
+                e.HBG.Visible = CFG.Enabled
+                
+                e.HBF.Position = U.V2(x + bw/2 + 4, y + bh/2 - (bh * pct))
+                e.HBF.Size = U.V2(bwid, bh * pct)
+                e.HBF.Color = hc
+                e.HBF.Visible = CFG.Enabled
+            end)
+        end
+        
+        if e.Name then
+            pcall(function()
+                e.Name.Position = U.V2(x, y - bh/2 - 22)
+                e.Name.Text = string.upper(p.Name)
+                e.Name.Visible = CFG.Enabled
+            end)
+        end
+        
+        if e.Dist and S.LP.Character and S.LP.Character:FindFirstChild("HumanoidRootPart") then
+            local lr = S.LP.Character.HumanoidRootPart
+            local dist = U.FLR((lr.Position - r.Position).Magnitude)
+            pcall(function()
+                e.Dist.Position = U.V2(x, y + bh/2 + 20)
+                e.Dist.Text = tostring(dist) .. "M"
+                e.Dist.Visible = CFG.Enabled
+            end)
+        end
+        
+        if e.Head and c:FindFirstChild("Head") then
+            local hd = c.Head
+            local hpos, hvis = W2S(hd.Position)
+            if hvis then
+                pcall(function()
+                    e.Head.Position = U.V2(hpos.X, hpos.Y)
+                    e.Head.Visible = CFG.Enabled
+                end)
+            end
+        end
+        
+        if e.Tracer and CFG.Tracer.Enabled and S.C then
+            pcall(function()
+                local origin = U.V2(S.C.ViewportSize.X/2, S.C.ViewportSize.Y)
+                e.Tracer.From = origin
+                e.Tracer.To = U.V2(x, y - bh/3)
+                e.Tracer.Color = CFG.Tracer.TeamColor and bc or CFG.Tracer.Color
+                e.Tracer.Visible = CFG.Enabled
+            end)
+        end
+        
+        if CFG.Skeleton.Enabled then
+            USKELETON(p, e, c)
+        end
+    end
+
+    local function CLEANUP()
+        for p, _ in pairs(CACHE.ESP) do
+            if not p or not p.Parent or not V(p) then
+                if CACHE.ESP[p] then
+                    for _, d in pairs(CACHE.ESP[p]) do
+                        if type(d) == "table" then
+                            for _, sd in pairs(d) do pcall(function() sd:Remove() end) end
+                        else
+                            pcall(function() d:Remove() end)
+                        end
+                    end
+                    CACHE.ESP[p] = nil
+                end
+            end
+        end
+    end
+
+    local function RESET()
+        for _, d in pairs(CACHE.Drawings) do
+            pcall(function() d:Remove() end)
+        end
+        CACHE.Drawings = {}
+        CACHE.ESP = {}
+        if CACHE.FOV then
+            pcall(function() CACHE.FOV:Remove() end)
+            CACHE.FOV = nil
+        end
+    end
+
+    local M = {}
+
+    function M.Enable()
+        CFG.Enabled = true
+        if not CACHE.FOV then
+            CACHE.FOV = SD("Circle", {
+                Radius = CFG.FOV.Radius,
+                Color = CFG.FOV.Color,
+                Thickness = CFG.FOV.Thickness,
+                NumSides = CFG.FOV.Sides,
+                Filled = CFG.FOV.Filled,
+                Transparency = CFG.FOV.Transparency,
+                Visible = true,
+                Position = GVC()
+            })
+        end
+    end
+
+    function M.Disable()
+        CFG.Enabled = false
+        if CACHE.FOV then
+            pcall(function() CACHE.FOV.Visible = false end)
+        end
+        for p, _ in pairs(CACHE.ESP) do
+            if CACHE.ESP[p] then
+                for _, d in pairs(CACHE.ESP[p]) do
+                    if type(d) == "table" then
+                        for _, sd in pairs(d) do pcall(function() sd.Visible = false end) end
+                    else
+                        pcall(function() d.Visible = false end)
+                    end
+                end
+            end
+        end
+    end
+
+    function M.Toggle()
+        if CFG.Enabled then M.Disable() else M.Enable() end
+    end
+
+    function M.SetFOVRadius(r)
+        CFG.FOV.Radius = r or 120
+        if CACHE.FOV then
+            pcall(function() CACHE.FOV.Radius = CFG.FOV.Radius end)
+        end
+    end
+
+    function M.SetFOVColor(r,g,b)
+        CFG.FOV.Color = U.C3(r,g,b)
+        if CACHE.FOV then
+            pcall(function() CACHE.FOV.Color = CFG.FOV.Color end)
+        end
+    end
+
+    function M.SetBoxStyle(s)
+        CFG.Box.Style = s or "2D"
+    end
+
+    function M.SetBoxThickness(t)
+        CFG.Box.Thickness = t or 1
+    end
+
+    function M.SetEnemyColor(r,g,b)
+        PALETTE.Enemy = U.C3(r,g,b)
+    end
+
+    function M.SetFriendColor(r,g,b)
+        PALETTE.Friend = U.C3(r,g,b)
+    end
+
+    function M.ToggleCorner(e)
+        CFG.Corner.Enabled = e ~= nil and e or not CFG.Corner.Enabled
+    end
+
+    function M.ToggleTracer(e)
+        CFG.Tracer.Enabled = e ~= nil and e or not CFG.Tracer.Enabled
+    end
+
+    function M.ToggleHead(e)
+        CFG.Head.Enabled = e ~= nil and e or not CFG.Head.Enabled
+    end
+
+    function M.ToggleSkeleton(e)
+        CFG.Skeleton.Enabled = e ~= nil and e or not CFG.Skeleton.Enabled
+    end
+
+    function M.ToggleHealthBar(e)
+        CFG.Box.HealthBar = e ~= nil and e or not CFG.Box.HealthBar
+    end
+
+    function M.ToggleNameTag(e)
+        CFG.Box.NameTag = e ~= nil and e or not CFG.Box.NameTag
+    end
+
+    function M.ToggleDistance(e)
+        CFG.Box.Distance = e ~= nil and e or not CFG.Box.Distance
+    end
+
+    function M.ToggleTeamColor(e)
+        CFG.Box.TeamColor = e ~= nil and e or not CFG.Box.TeamColor
+    end
+
+    function M.Reset()
+        RESET()
+    end
+
+    function M.IsEnabled()
+        return CFG.Enabled
+    end
+
+    function M.GetConfig()
+        return CFG
+    end
+
+    function M.SetConfig(c)
+        CFG = c or CFG
+    end
+
+    S.RS.RenderStepped:Connect(function()
+        if not S.C then S.C = S.WS.CurrentCamera end
+        if not S.C then return end
+        
+        if CACHE.FOV and CFG.Enabled then
+            pcall(function()
+                CACHE.FOV.Position = GVC()
+                CACHE.FOV.Visible = true
+            end)
+        elseif CACHE.FOV then
+            pcall(function() CACHE.FOV.Visible = false end)
+        end
+        
+        if CFG.Enabled then
+            for _, p in ipairs(S.P:GetPlayers()) do
+                if p ~= S.LP then
+                    PROCESS(p)
+                end
+            end
+            CLEANUP()
+        end
+    end)
+
+    return M
+end)()
+
+_G.ARC = _G.ARC or {}
+_G.ARC.VISUAL = VISUAL
+_G.ARC.Visual = VISUAL
+
+return VISUAL
