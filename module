@@ -1,0 +1,657 @@
+local Lib = {}
+do
+    local Players = game:GetService("Players")
+    local RunService = game:GetService("RunService")
+    local UserInputService = game:GetService("UserInputService")
+    local Workspace = game:GetService("Workspace")
+    local Camera = Workspace.CurrentCamera
+    local LocalPlayer = Players.LocalPlayer
+    local HttpService = game:GetService("HttpService")
+    local Context = game:GetService("ContextActionService")
+    local Virtual = game:GetService("VirtualInputManager")
+    local Touch = game:GetService("TouchInputService")
+    local Gui = game:GetService("GuiService")
+    
+    local mt = getrawmetatable(game)
+    local old = mt.__namecall
+    setreadonly(mt, false)
+    
+    local isMobile = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
+    local isConsole = UserInputService.GamepadEnabled
+    local isVR = UserInputService.VREnabled
+    
+    local function v3(x,y,z) return Vector3.new(x or 0,y or 0,z or 0) end
+    local function v2(x,y) return Vector2.new(x or 0,y or 0) end
+    local function cf(p,l) return CFrame.lookAt(p or v3(), l or v3()) end
+    
+    local function validate(p)
+        local s,e = pcall(function()
+            return p and p.Parent and Players:FindFirstChild(p.Parent.Name) and 
+                   p.Parent:FindFirstChild("Humanoid") and 
+                   p.Parent.Humanoid.Health > 0 and
+                   p.Parent:FindFirstChild("HumanoidRootPart")
+        end)
+        return s and e
+    end
+    
+    local function get_root(p)
+        if not p then return nil end
+        return p.Character and p.Character:FindFirstChild("HumanoidRootPart")
+    end
+    
+    local function get_part(c,n)
+        return c and (c:FindFirstChild(n) or c:FindFirstChild("HumanoidRootPart"))
+    end
+    
+    local function world_to_screen(p)
+        local v, vis = Camera:WorldToViewportPoint(p)
+        return v2(v.X, v.Y), v.Z, vis
+    end
+    
+    local function get_controller()
+        for i = 0, 7 do
+            if UserInputService:GetGamepadConnected(Enum.UserInputType.Gamepad1.Value + i) then
+                return Enum.UserInputType.Gamepad1.Value + i
+            end
+        end
+        return nil
+    end
+    
+    local cross = {
+        fov = 180,
+        team = true,
+        wall = false,
+        visible = true
+    }
+    
+    local function by_cross(t)
+        local center = v2(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+        local closest, dist = nil, t or cross.fov
+        for _,p in pairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and validate(p) then
+                if cross.team and p.Team == LocalPlayer.Team then continue end
+                local root = get_root(p)
+                if root then
+                    local pos, _, vis = world_to_screen(root.Position)
+                    if vis then
+                        local mag = (pos - center).Magnitude
+                        if mag < dist then
+                            closest, dist = p, mag
+                        end
+                    end
+                end
+            end
+        end
+        return closest
+    end
+    
+    local function by_mouse(t)
+        local mpos = v2(UserInputService:GetMouseLocation().X, UserInputService:GetMouseLocation().Y)
+        local closest, dist = nil, t or 200
+        for _,p in pairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and validate(p) then
+                if cross.team and p.Team == LocalPlayer.Team then continue end
+                local root = get_root(p)
+                if root then
+                    local pos, _, vis = world_to_screen(root.Position)
+                    if vis then
+                        local mag = (pos - mpos).Magnitude
+                        if mag < dist then
+                            closest, dist = p, mag
+                        end
+                    end
+                end
+            end
+        end
+        return closest
+    end
+    
+    local function by_touch(tp)
+        local closest, dist = nil, 100
+        for _,p in pairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and validate(p) then
+                if cross.team and p.Team == LocalPlayer.Team then continue end
+                local root = get_root(p)
+                if root then
+                    local pos, _, vis = world_to_screen(root.Position)
+                    if vis then
+                        local mag = (pos - tp).Magnitude
+                        if mag < dist then
+                            closest, dist = p, mag
+                        end
+                    end
+                end
+            end
+        end
+        return closest
+    end
+    
+    local silent = {
+        state = false,
+        chance = 100,
+        bone = "Head",
+        fov = 180,
+        team = true,
+        visible = true,
+        wall = false,
+        resolver = false,
+        prediction = 0.15,
+        drop = 0,
+        gravity = workspace.Gravity,
+        priority = "crosshair"
+    }
+    
+    function silent:target()
+        if not self.state then return nil end
+        local t = by_cross(self.fov)
+        if t then
+            local part = get_part(t.Character, self.bone)
+            if part then
+                local vis = true
+                if self.visible then
+                    local p = RaycastParams.new()
+                    p.FilterDescendantsInstances = {t.Character, LocalPlayer.Character}
+                    p.FilterType = Enum.RaycastFilterType.Blacklist
+                    local ray = Workspace:Raycast(Camera.CFrame.Position, (part.Position - Camera.CFrame.Position).Unit * 500, p)
+                    vis = ray == nil
+                end
+                if vis then
+                    if self.wall then
+                        local p = RaycastParams.new()
+                        p.FilterDescendantsInstances = {LocalPlayer.Character, t.Character}
+                        p.FilterType = Enum.RaycastFilterType.Blacklist
+                        local ray = Workspace:Raycast(Camera.CFrame.Position, (part.Position - Camera.CFrame.Position).Unit * 500, p)
+                        if ray then return nil end
+                    end
+                    if self.resolver then
+                        local vel = part.AssemblyLinearVelocity
+                        local pos = part.Position + vel * self.prediction
+                        local dist = (Camera.CFrame.Position - part.Position).Magnitude
+                        local g = v3(0, -self.gravity * self.drop * dist * 0.001, 0)
+                        return pos + g
+                    end
+                    return part.Position
+                end
+            end
+        end
+        return nil
+    end
+    
+    local aim = {
+        state = false,
+        mode = "camera",
+        smooth = 0.1,
+        bone = "Head",
+        team = true,
+        visible = true,
+        prediction = 0.15,
+        key = Enum.UserInputType.MouseButton2,
+        pad = Enum.KeyCode.ButtonR2,
+        touch = false,
+        touch_sens = 0.5,
+        stick = Enum.KeyCode.Thumbstick2,
+        deadzone = 0.2,
+        controller = true,
+        mobile = true,
+        dynamic = true,
+        fov = 200,
+        silent = false
+    }
+    
+    function aim:velocity(t)
+        local hrp = t.Parent and t.Parent:FindFirstChild("HumanoidRootPart")
+        return hrp and hrp.AssemblyLinearVelocity or v3()
+    end
+    
+    function aim:predicted(t)
+        local base = t.Position
+        local vel = self:velocity(t)
+        local dist = (Camera.CFrame.Position - base).Magnitude
+        local factor = self.prediction
+        if self.dynamic then
+            if dist > 150 then factor = factor * 1.5
+            elseif dist > 80 then factor = factor * 1.2
+            elseif dist < 30 then factor = factor * 0.8 end
+        end
+        return base + vel * factor
+    end
+    
+    function aim:active()
+        if not self.state then return false end
+        if isMobile and self.mobile and self.touch then
+            return #UserInputService:GetTouchInputs() > 0
+        end
+        if isConsole or self.controller then
+            if self.pad and UserInputService:IsGamepadButtonDown(self.pad) then
+                return true
+            end
+            if self.stick then
+                local s = UserInputService:GetGamepadState(get_controller() or 0)
+                for _,v in pairs(s) do
+                    if v.KeyCode == self.stick then
+                        return math.abs(v.Position.X) > self.deadzone or math.abs(v.Position.Y) > self.deadzone
+                    end
+                end
+            end
+        end
+        if self.key and typeof(self.key) == "EnumItem" then
+            if self.key.EnumType == Enum.UserInputType then
+                return UserInputService:IsMouseButtonPressed(self.key)
+            elseif self.key.EnumType == Enum.KeyCode then
+                return UserInputService:IsKeyDown(self.key)
+            end
+        end
+        return false
+    end
+    
+    function aim:update()
+        if not self:active() then return end
+        
+        local t = nil
+        if self.silent then
+            t = by_cross(self.fov)
+        else
+            t = by_mouse(self.fov)
+        end
+        
+        if not t then return end
+        if self.team and t.Team == LocalPlayer.Team then return end
+        
+        local part = get_part(t.Character, self.bone)
+        if not part then return end
+        
+        if self.visible then
+            local p = RaycastParams.new()
+            p.FilterDescendantsInstances = {t.Character, LocalPlayer.Character}
+            p.FilterType = Enum.RaycastFilterType.Blacklist
+            local ray = Workspace:Raycast(Camera.CFrame.Position, (part.Position - Camera.CFrame.Position).Unit * 500, p)
+            if ray then return end
+        end
+        
+        local pos = self:predicted(part)
+        local smooth = self.smooth
+        
+        if self.mode == "camera" then
+            local look = cf(Camera.CFrame.Position, pos)
+            Camera.CFrame = Camera.CFrame:Lerp(look, smooth)
+        elseif self.mode == "mouse" and not isMobile then
+            local vec, vis = Camera:WorldToViewportPoint(pos)
+            if vis then
+                local mp = v2(UserInputService:GetMouseLocation().X, UserInputService:GetMouseLocation().Y)
+                local delta = v2(vec.X, vec.Y) - mp
+                mousemoverel(delta.X * smooth, delta.Y * smooth)
+            end
+        elseif self.mode == "touch" and isMobile then
+            local vec, vis = Camera:WorldToViewportPoint(pos)
+            if vis then
+                local center = v2(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+                local delta = v2(vec.X, vec.Y) - center
+                local move = delta * self.touch_sens * 0.01
+                Virtual:SendMouseMoveEvent(move.X, move.Y)
+            end
+        elseif self.mode == "stick" and (isConsole or self.controller) then
+            local vec, vis = Camera:WorldToViewportPoint(pos)
+            if vis then
+                local center = v2(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+                local delta = v2(vec.X, vec.Y) - center
+                local nx = math.clamp(delta.X / 200, -1, 1)
+                local ny = math.clamp(delta.Y / 200, -1, 1)
+                local gpid = get_controller() or 0
+                UserInputService:SetGamepadCFrame(gpid, CF.new(), CF.Angles(-ny * 0.5, -nx * 0.5, 0))
+            end
+        end
+    end
+    
+    local trigger = {
+        state = false,
+        delay = 0.05,
+        burst = 1,
+        burst_delay = 0.025,
+        team = true,
+        visible = true,
+        fov = 50,
+        bone = "Head",
+        key = Enum.KeyCode.E,
+        pad = Enum.KeyCode.ButtonL2,
+        touch = false,
+        toggle = false,
+        hold = false,
+        prediction = false,
+        hitchance = 100
+    }
+    
+    function trigger:should()
+        if not self.state then return false end
+        if self.toggle then return true end
+        if self.hold then
+            if isMobile and self.touch then
+                return #UserInputService:GetTouchInputs() > 0
+            end
+            if isConsole or aim.controller then
+                if self.pad and UserInputService:IsGamepadButtonDown(self.pad) then
+                    return true
+                end
+            end
+            if self.key and UserInputService:IsKeyDown(self.key) then
+                return true
+            end
+        end
+        return false
+    end
+    
+    function trigger:update()
+        if not self:should() then return end
+        if math.random(1,100) > self.hitchance then return end
+        
+        local t = by_cross(self.fov)
+        if not t then return end
+        if self.team and t.Team == LocalPlayer.Team then return end
+        
+        local part = get_part(t.Character, self.bone)
+        if not part then return end
+        
+        if self.visible then
+            local p = RaycastParams.new()
+            p.FilterDescendantsInstances = {t.Character, LocalPlayer.Character}
+            p.FilterType = Enum.RaycastFilterType.Blacklist
+            local ray = Workspace:Raycast(Camera.CFrame.Position, (part.Position - Camera.CFrame.Position).Unit * 500, p)
+            if ray then return end
+        end
+        
+        task.wait(self.delay)
+        
+        for i = 1, self.burst do
+            Virtual:SendMouseButtonEvent(0, 0, 0, true, game, 1)
+            task.wait(self.burst_delay)
+            Virtual:SendMouseButtonEvent(0, 0, 0, false, game, 1)
+            if i < self.burst then
+                task.wait(self.burst_delay)
+            end
+        end
+    end
+    
+    local antiaim = {
+        state = false,
+        pitch = 0,
+        yaw = 0,
+        roll = 0,
+        jitter = false,
+        jitter_range = 5,
+        fake = false,
+        fake_angle = 90,
+        slow = false,
+        slow_factor = 0.5,
+        silent = false
+    }
+    
+    function antiaim:update()
+        if not self.state then return end
+        if not LocalPlayer.Character then return end
+        local root = get_root(LocalPlayer)
+        if not root then return end
+        
+        local jx, jy, jz = 0,0,0
+        if self.jitter then
+            jx = math.random(-self.jitter_range, self.jitter_range) / 10
+            jy = math.random(-self.jitter_range, self.jitter_range) / 10
+            jz = math.random(-self.jitter_range, self.jitter_range) / 10
+        end
+        
+        local angles = v3(
+            math.rad(self.pitch + jx),
+            math.rad(self.yaw + jy),
+            math.rad(self.roll + jz)
+        )
+        
+        if self.silent then
+            local oldpos = root.CFrame
+            root.CFrame = oldpos * CF.Angles(angles.X, angles.Y, angles.Z)
+        end
+    end
+    
+    local indicator = {
+        state = false,
+        silent = nil,
+        aim = nil,
+        trigger = nil,
+        color = Color3.fromRGB(0,255,0),
+        inactive = Color3.fromRGB(255,0,0),
+        font = Drawing.Fonts.UI,
+        size = 14,
+        pos = v2(10,10)
+    }
+    
+    if indicator.state and Drawing then
+        local txt = Drawing.new("Text")
+        txt.Size = indicator.size
+        txt.Font = indicator.font
+        txt.Color = indicator.color
+        txt.Outline = true
+        txt.OutlineColor = Color3.fromRGB(0,0,0)
+        
+        RunService.RenderStepped:Connect(function()
+            if not indicator.state then txt.Visible = false return end
+            txt.Position = indicator.pos
+            local s = silent.state and "S" or ""
+            local a = aim.state and "A" or ""
+            local t = trigger.state and "T" or ""
+            txt.Text = string.format("[%s%s%s]", s, a, t)
+            txt.Color = (silent.state or aim.state or trigger.state) and indicator.color or indicator.inactive
+            txt.Visible = true
+        end)
+    end
+    
+    local mobile = {
+        aim_button = false,
+        trigger_button = false,
+        aim_pos = v2(100, 100),
+        trigger_pos = v2(100, 200),
+        radius = 50,
+        alpha = 0.7,
+        aim_color = Color3.fromRGB(0,100,255),
+        trigger_color = Color3.fromRGB(255,50,50)
+    }
+    
+    if isMobile and Drawing then
+        local btn_aim = Drawing.new("Circle")
+        local btn_trig = Drawing.new("Circle")
+        local lbl_aim = Drawing.new("Text")
+        local lbl_trig = Drawing.new("Text")
+        
+        btn_aim.Radius = mobile.radius
+        btn_aim.Filled = true
+        btn_aim.Color = mobile.aim_color
+        btn_aim.Transparency = mobile.alpha
+        btn_aim.NumSides = 32
+        
+        btn_trig.Radius = mobile.radius
+        btn_trig.Filled = true
+        btn_trig.Color = mobile.trigger_color
+        btn_trig.Transparency = mobile.alpha
+        btn_trig.NumSides = 32
+        
+        lbl_aim.Size = 16
+        lbl_aim.Font = Drawing.Fonts.UI
+        lbl_aim.Text = "AIM"
+        lbl_aim.Color = Color3.fromRGB(255,255,255)
+        lbl_aim.Outline = true
+        
+        lbl_trig.Size = 16
+        lbl_trig.Font = Drawing.Fonts.UI
+        lbl_trig.Text = "TRIG"
+        lbl_trig.Color = Color3.fromRGB(255,255,255)
+        lbl_trig.Outline = true
+        
+        RunService.RenderStepped:Connect(function()
+            if not isMobile then return end
+            btn_aim.Position = mobile.aim_pos
+            btn_trig.Position = mobile.trigger_pos
+            lbl_aim.Position = mobile.aim_pos - v2(lbl_aim.TextBounds.X/2, 8)
+            lbl_trig.Position = mobile.trigger_pos - v2(lbl_trig.TextBounds.X/2, 8)
+            
+            btn_aim.Visible = mobile.aim_button
+            btn_trig.Visible = mobile.trigger_button
+            lbl_aim.Visible = mobile.aim_button
+            lbl_trig.Visible = mobile.trigger_button
+        end)
+        
+        UserInputService.TouchTap:Connect(function(touches, game)
+            if game then return end
+            for _,t in pairs(touches) do
+                local pos = v2(t.Position.X, t.Position.Y)
+                if mobile.aim_button and (pos - mobile.aim_pos).Magnitude < mobile.radius then
+                    aim.touch = not aim.touch
+                end
+                if mobile.trigger_button and (pos - mobile.trigger_pos).Magnitude < mobile.radius then
+                    trigger.hold = not trigger.hold
+                end
+            end
+        end)
+    end
+    
+    local controller = {
+        enabled = true,
+        aim_sens = 0.3,
+        trigger_sens = 0.5,
+        deadzone = 0.2,
+        vibration = true,
+        aim_pad = Enum.KeyCode.ButtonR2,
+        trigger_pad = Enum.KeyCode.ButtonL2,
+        stick = Enum.KeyCode.Thumbstick2
+    }
+    
+    function controller:update()
+        if not self.enabled then return end
+        local gpid = get_controller()
+        if not gpid then return end
+        
+        if aim.controller and aim.state then
+            local state = UserInputService:GetGamepadState(gpid)
+            for _,v in pairs(state) do
+                if v.KeyCode == self.stick then
+                    if math.abs(v.Position.X) > self.deadzone or math.abs(v.Position.Y) > self.deadzone then
+                        local t = by_cross(aim.fov)
+                        if t then
+                            local part = get_part(t.Character, aim.bone)
+                            if part then
+                                local pos = world_to_screen(part.Position)
+                                local center = v2(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+                                local delta = v2(pos.X, pos.Y) - center
+                                UserInputService:SetGamepadCFrame(gpid, CF.new(), CF.Angles(-delta.Y * 0.001 * self.aim_sens, -delta.X * 0.001 * self.aim_sens, 0))
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        
+        if self.vibration and (aim:active() or trigger:should()) then
+            UserInputService:SetGamepadVibration(gpid, 0.5, 0.5)
+        else
+            UserInputService:SetGamepadVibration(gpid, 0, 0)
+        end
+    end
+    
+    RunService.RenderStepped:Connect(function()
+        pcall(function()
+            aim:update()
+            trigger:update()
+            antiaim:update()
+            controller:update()
+        end)
+    end)
+    
+    mt.__namecall = newcclosure(function(s, ...)
+        local a, m = {...}, getnamecallmethod()
+        
+        if silent.state and (m == "FindPartOnRay" or m == "FindPartOnRayWithIgnoreList" or m == "Raycast") then
+            local tpos = silent:target()
+            if tpos and math.random(1,100) <= silent.chance then
+                local dir = (tpos - Camera.CFrame.Position).Unit * 1000
+                if type(a[1]) == "userdata" and typeof(a[1]) == "Ray" then
+                    local ray = Ray.new(Camera.CFrame.Position, dir)
+                    return old(s, unpack({ray, table.unpack(a, 2)}))
+                elseif type(a[1]) == "userdata" and typeof(a[1]) == "Vector3" then
+                    return old(s, unpack({Camera.CFrame.Position, dir, table.unpack(a, 3)}))
+                end
+            end
+        end
+        
+        return old(s, ...)
+    end)
+    
+    setreadonly(mt, true)
+    
+    function Lib.Silent(c)
+        if c then for k,v in pairs(c) do silent[k] = v end end
+        silent.state = true
+        return silent
+    end
+    
+    function Lib.Aimbot(c)
+        if c then for k,v in pairs(c) do aim[k] = v end end
+        aim.state = true
+        return aim
+    end
+    
+    function Lib.Trigger(c)
+        if c then for k,v in pairs(c) do trigger[k] = v end end
+        trigger.state = true
+        return trigger
+    end
+    
+    function Lib.Anti(c)
+        if c then for k,v in pairs(c) do antiaim[k] = v end end
+        antiaim.state = true
+        return antiaim
+    end
+    
+    function Lib.Indicator(c)
+        if c then for k,v in pairs(c) do indicator[k] = v end end
+        indicator.state = true
+        return indicator
+    end
+    
+    function Lib.Mobile(c)
+        if c then for k,v in pairs(c) do mobile[k] = v end end
+        mobile.aim_button = true
+        mobile.trigger_button = true
+        aim.mobile = true
+        aim.touch = true
+        trigger.touch = true
+        return mobile
+    end
+    
+    function Lib.Controller(c)
+        if c then for k,v in pairs(c) do controller[k] = v end end
+        controller.enabled = true
+        aim.controller = true
+        return controller
+    end
+    
+    function Lib.Platform()
+        return {
+            Mobile = isMobile,
+            Console = isConsole,
+            VR = isVR,
+            Touch = UserInputService.TouchEnabled,
+            Gamepad = UserInputService.GamepadEnabled,
+            Mouse = UserInputService.MouseEnabled,
+            Keyboard = UserInputService.KeyboardEnabled
+        }
+    end
+    
+    function Lib.W2S(p)
+        return world_to_screen(p)
+    end
+    
+    function Lib.Targets()
+        return {
+            Cross = by_cross,
+            Mouse = by_mouse,
+            Touch = by_touch
+        }
+    end
+end
+
+return Lib
