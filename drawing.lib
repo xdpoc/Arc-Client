@@ -1,10 +1,8 @@
-local D = (function()
+local DrawingLib = (function()
     local S = {
         P = game:GetService("Players"),
         RS = game:GetService("RunService"),
-        UIS = game:GetService("UserInputService"),
-        WS = game:GetService("Workspace"),
-        T = game:GetService("TweenService")
+        WS = game:GetService("Workspace")
     }
     S.C = S.WS.CurrentCamera
     S.LP = S.P.LocalPlayer
@@ -12,72 +10,47 @@ local D = (function()
     local C = {
         D = {},
         E = {},
-        F = nil,
-        S = {},
-        V = {}
+        F = nil
     }
 
     local U = {
         V2 = function(x,y) return Vector2.new(x or 0, y or 0) end,
-        V3 = function(x,y,z) return Vector3.new(x or 0, y or 0, z or 0) end,
         C3 = function(r,g,b) return Color3.fromRGB(r or 255, g or 255, b or 255) end,
         CL = function(n,l,h) return math.clamp(n, l or 0, h or 1) end,
-        F = math.floor,
-        M = math.min,
-        X = math.max,
-        A = math.abs,
-        R = math.rad,
-        T = tick
+        F = math.floor
     }
 
     local P = {
-        Enemy = U.C3(255, 80, 80),
-        Friend = U.C3(80, 255, 120),
-        Outline = U.C3(0, 0, 0),
-        Text = U.C3(255, 255, 255),
-        HealthG = U.C3(80, 255, 80),
-        HealthY = U.C3(255, 220, 80),
-        HealthR = U.C3(255, 80, 80),
-        FOV = U.C3(255, 120, 120),
-        Tracer = U.C3(255, 80, 80),
-        Skeleton = U.C3(255, 255, 255),
-        Head = U.C3(255, 220, 40)
+        White = U.C3(255,255,255),
+        Red = U.C3(255,70,70),
+        Green = U.C3(70,255,120),
+        Blue = U.C3(70,70,255),
+        Yellow = U.C3(255,220,70),
+        Purple = U.C3(255,70,255),
+        Cyan = U.C3(70,255,255),
+        Orange = U.C3(255,140,70),
+        Black = U.C3(0,0,0),
+        Gray = U.C3(200,200,200)
     }
 
     local G = {
         E = false,
-        R = 120,
-        B = {
-            W = 55,
-            H = 110,
-            T = 1,
-            OT = 2,
-            S = 750,
-            SM = 0.6,
-            SX = 2.5,
-            HB = true,
-            NT = true,
-            D = true,
-            TC = true
-        },
-        C = {
-            E = false,
-            L = 8,
-            T = 2
-        },
-        TR = {
-            E = false,
-            T = 1
-        },
-        H = {
-            E = false,
-            R = 4
-        },
-        SK = {
-            E = false,
-            T = 2,
-            TR = 0.2
-        }
+        B = false,
+        C = false,
+        T = false,
+        H = false,
+        N = false,
+        HB = false,
+        D = false,
+        SK = false,
+        F = false,
+        BC = P.White,
+        HC = P.White,
+        FC = P.White,
+        BS = 1.0,
+        BT = 1.25,
+        FR = 120,
+        FT = 1.5
     }
 
     local function DR(t, p)
@@ -113,57 +86,35 @@ local D = (function()
         if C.E[p] then return C.E[p] end
         local e = {}
         
-        e.BO = DR("Square", {T = G.B.OT, C = P.Outline, F = false, V = false})
-        e.B = DR("Square", {T = G.B.T, C = P.Enemy, F = false, V = false})
+        e.BO = DR("Square", {Thickness = G.BT + 1, Color = P.Black, Filled = false, Visible = false})
+        e.B = DR("Square", {Thickness = G.BT, Color = G.BC, Filled = false, Visible = false})
+        e.N = DR("Text", {Text = p.Name, Color = P.White, Size = 16, Center = true, Outline = true, OutlineColor = P.Black, Visible = false})
+        e.H = DR("Circle", {Radius = 4, Filled = true, Color = G.HC, Transparency = 0.3, NumSides = 16, Visible = false})
+        e.TR = DR("Line", {Thickness = 1, Color = G.BC, Visible = false})
+        e.HBG = DR("Square", {Color = P.Black, Filled = true, Transparency = 0.5, Visible = false})
+        e.HF = DR("Square", {Filled = true, Transparency = 0.2, Visible = false})
+        e.DT = DR("Text", {Text = "0M", Color = P.Gray, Size = 13, Center = true, Outline = true, OutlineColor = P.Black, Visible = false})
         
-        if G.C.E then
-            for i = 1, 8 do
-                e["C"..i] = DR("Line", {T = G.C.T, C = P.Outline, V = false})
-            end
+        for i = 1, 8 do
+            e["C"..i] = DR("Line", {Thickness = G.BT + 1, Color = G.BC, Visible = false})
         end
         
-        if G.B.NT then
-            e.N = DR("Text", {T = p.Name, C = P.Text, S = 16, Cen = true, O = true, OC = P.Outline, V = false})
-        end
-        
-        if G.B.HB then
-            e.HB = DR("Square", {C = P.Outline, F = true, TR = 0.5, V = false})
-            e.HF = DR("Square", {C = P.HealthG, F = true, TR = 0.2, V = false})
-        end
-        
-        if G.B.D then
-            e.D = DR("Text", {T = "0M", C = P.Text, S = 13, Cen = true, O = true, OC = P.Outline, V = false})
-        end
-        
-        if G.H.E then
-            e.H = DR("Circle", {R = G.H.R, F = true, C = P.Head, TR = 0.3, V = false, NS = 16})
-        end
-        
-        if G.TR.E then
-            e.T = DR("Line", {T = G.TR.T, C = P.Tracer, V = false})
-        end
-        
-        if G.SK.E then
-            e.SK = {}
-            local b = {"Hd", "To", "LA", "RA", "LL", "RL"}
-            for _, v in ipairs(b) do
-                if v == "Hd" then
-                    e.SK[v] = DR("Circle", {R = 3, F = true, C = P.Head, V = false})
-                elseif v == "To" then
-                    e.SK[v] = DR("Square", {F = true, C = G.SK.C or P.Skeleton, TR = G.SK.TR, V = false})
-                else
-                    e.SK[v] = DR("Line", {T = G.SK.T, C = G.SK.C or P.Skeleton, TR = G.SK.TR, V = false})
-                end
-            end
-        end
+        e.SK = {
+            H = DR("Circle", {Radius = 3, Filled = true, Color = G.HC, Visible = false}),
+            T = DR("Square", {Filled = true, Color = G.BC, Transparency = 0.2, Visible = false}),
+            LA = DR("Line", {Thickness = 2, Color = G.BC, Transparency = 0.2, Visible = false}),
+            RA = DR("Line", {Thickness = 2, Color = G.BC, Transparency = 0.2, Visible = false}),
+            LL = DR("Line", {Thickness = 2, Color = G.BC, Transparency = 0.2, Visible = false}),
+            RL = DR("Line", {Thickness = 2, Color = G.BC, Transparency = 0.2, Visible = false})
+        }
         
         C.E[p] = e
         return e
     end
 
     local function UC(e, x, y, w, h)
-        if not e or not G.C.E then return end
-        local l = G.C.L
+        if not e then return end
+        local l = 8
         local ps = {
             {U.V2(x - w/2, y - h/2), U.V2(x - w/2 + l, y - h/2)},
             {U.V2(x - w/2, y - h/2), U.V2(x - w/2, y - h/2 + l)},
@@ -178,13 +129,15 @@ local D = (function()
             if e["C"..i] then
                 e["C"..i].From = ps[i][1]
                 e["C"..i].To = ps[i][2]
-                e["C"..i].Visible = G.E
+                e["C"..i].Color = G.BC
+                e["C"..i].Thickness = G.BT + 1
+                e["C"..i].Visible = G.E and G.C
             end
         end
     end
 
     local function US(e, c)
-        if not c or not e.SK or not G.SK.E then return end
+        if not c or not e.SK then return end
         local hd = c:FindFirstChild("Head")
         local to = c:FindFirstChild("Torso") or c:FindFirstChild("UpperTorso")
         local la = c:FindFirstChild("Left Arm") or c:FindFirstChild("LeftHand") or c:FindFirstChild("LeftUpperArm")
@@ -192,17 +145,17 @@ local D = (function()
         local ll = c:FindFirstChild("Left Leg") or c:FindFirstChild("LeftLowerLeg") or c:FindFirstChild("LeftFoot")
         local rl = c:FindFirstChild("Right Leg") or c:FindFirstChild("RightLowerLeg") or c:FindFirstChild("RightFoot")
         
-        if hd and e.SK.Hd then
+        if hd and e.SK.H then
             local p, _, v = W2S(hd.Position)
-            if v then e.SK.Hd.Position = p; e.SK.Hd.Visible = G.E end
+            if v then e.SK.H.Position = p; e.SK.H.Visible = G.E and G.SK end
         end
         
-        if to and e.SK.To then
+        if to and e.SK.T then
             local p, _, v = W2S(to.Position)
             if v then
-                e.SK.To.Position = U.V2(p.X - 15, p.Y - 20)
-                e.SK.To.Size = U.V2(30, 40)
-                e.SK.To.Visible = G.E
+                e.SK.T.Position = U.V2(p.X - 15, p.Y - 20)
+                e.SK.T.Size = U.V2(30, 40)
+                e.SK.T.Visible = G.E and G.SK
             end
         end
         
@@ -212,7 +165,7 @@ local D = (function()
             if lv and tv then
                 e.SK.LA.From = tp
                 e.SK.LA.To = lp
-                e.SK.LA.Visible = G.E
+                e.SK.LA.Visible = G.E and G.SK
             end
         end
         
@@ -222,7 +175,7 @@ local D = (function()
             if rv and tv then
                 e.SK.RA.From = tp
                 e.SK.RA.To = rp
-                e.SK.RA.Visible = G.E
+                e.SK.RA.Visible = G.E and G.SK
             end
         end
         
@@ -232,7 +185,7 @@ local D = (function()
             if lv and tv then
                 e.SK.LL.From = U.V2(tp.X, tp.Y + 15)
                 e.SK.LL.To = lp
-                e.SK.LL.Visible = G.E
+                e.SK.LL.Visible = G.E and G.SK
             end
         end
         
@@ -242,7 +195,7 @@ local D = (function()
             if rv and tv then
                 e.SK.RL.From = U.V2(tp.X, tp.Y + 15)
                 e.SK.RL.To = rp
-                e.SK.RL.Visible = G.E
+                e.SK.RL.Visible = G.E and G.SK
             end
         end
     end
@@ -252,8 +205,11 @@ local D = (function()
         if not VV(pl) then
             if C.E[pl] then
                 for _, d in pairs(C.E[pl]) do
-                    if type(d) == "table" then for _, sd in pairs(d) do pcall(function() sd.Visible = false end) end
-                    else pcall(function() d.Visible = false end) end
+                    if type(d) == "table" then
+                        for _, sd in pairs(d) do pcall(function() sd.Visible = false end) end
+                    else
+                        pcall(function() d.Visible = false end)
+                    end
                 end
             end
             return
@@ -268,65 +224,70 @@ local D = (function()
         if not vf then return end
         
         local e = CE(pl)
-        local s = U.CL(G.B.S / (d3 + 0.01), G.B.SM, G.B.SX)
-        local w = U.F(G.B.W * s)
-        local hx = U.F(G.B.H * s)
+        local s = U.CL(650 / (d3 + 0.01) * G.BS, 0.6, 2.5)
+        local w = U.F(45 * s)
+        local hx = U.F(90 * s)
         local x, y = v2.X, v2.Y
-        
-        local tc = pl.Team and S.LP.Team and pl.Team == S.LP.Team
-        local bc = tc and P.Friend or P.Enemy
         
         if e.B and e.BO then
             e.B.Position = U.V2(x - w/2, y - hx/2)
             e.B.Size = U.V2(w, hx)
-            e.B.Color = bc
-            e.B.Visible = G.E
+            e.B.Color = G.BC
+            e.B.Thickness = G.BT
+            e.B.Visible = G.E and G.B
+            
             e.BO.Position = U.V2(x - w/2 - 1, y - hx/2 - 1)
             e.BO.Size = U.V2(w + 2, hx + 2)
-            e.BO.Visible = G.E
+            e.BO.Thickness = G.BT + 1
+            e.BO.Visible = G.E and G.B
         end
         
-        if G.C.E then UC(e, x, y, w, hx) end
+        if G.C then UC(e, x, y, w, hx) else for i = 1, 8 do if e["C"..i] then e["C"..i].Visible = false end end end
         
-        if e.HB and e.HF and G.B.HB then
-            local hp = h.Health / h.MaxHealth
-            local hc = hp > 0.6 and P.HealthG or hp > 0.3 and P.HealthY or P.HealthR
-            e.HB.Position = U.V2(x + w/2 + 4, y - hx/2)
-            e.HB.Size = U.V2(5, hx)
-            e.HB.Visible = G.E
-            e.HF.Position = U.V2(x + w/2 + 4, y + hx/2 - (hx * hp))
-            e.HF.Size = U.V2(5, hx * hp)
-            e.HF.Color = hc
-            e.HF.Visible = G.E
+        if e.TR and S.C then
+            e.TR.From = VC()
+            e.TR.To = U.V2(x, y)
+            e.TR.Color = G.BC
+            e.TR.Visible = G.E and G.T
         end
         
-        if e.N and G.B.NT then
+        if e.H and c:FindFirstChild("Head") then
+            local hp, hv = W2S(c.Head.Position)
+            if hv then
+                e.H.Position = hp
+                e.H.Color = G.HC
+                e.H.Visible = G.E and G.H
+            end
+        end
+        
+        if e.N then
             e.N.Position = U.V2(x, y - hx/2 - 22)
             e.N.Text = string.upper(pl.Name)
-            e.N.Visible = G.E
+            e.N.Visible = G.E and G.N
         end
         
-        if e.D and G.B.D and S.LP.Character and S.LP.Character:FindFirstChild("HumanoidRootPart") then
+        if e.HBG and e.HF then
+            local hp = h.Health / h.MaxHealth
+            local hc = hp > 0.6 and P.Green or hp > 0.3 and P.Yellow or P.Red
+            e.HBG.Position = U.V2(x + w/2 + 5, y - hx/2)
+            e.HBG.Size = U.V2(5, hx)
+            e.HBG.Visible = G.E and G.HB
+            
+            e.HF.Position = U.V2(x + w/2 + 5, y + hx/2 - (hx * hp))
+            e.HF.Size = U.V2(5, hx * hp)
+            e.HF.Color = hc
+            e.HF.Visible = G.E and G.HB
+        end
+        
+        if e.DT and S.LP.Character and S.LP.Character:FindFirstChild("HumanoidRootPart") then
             local lr = S.LP.Character.HumanoidRootPart
             local d = U.F((lr.Position - r.Position).Magnitude)
-            e.D.Position = U.V2(x, y + hx/2 + 20)
-            e.D.Text = d .. "M"
-            e.D.Visible = G.E
+            e.DT.Position = U.V2(x, y + hx/2 + 20)
+            e.DT.Text = d .. "M"
+            e.DT.Visible = G.E and G.D
         end
         
-        if e.H and G.H.E and c:FindFirstChild("Head") then
-            local hp, hv = W2S(c.Head.Position)
-            if hv then e.H.Position = hp; e.H.Visible = G.E end
-        end
-        
-        if e.T and G.TR.E and S.C then
-            e.T.From = U.V2(S.C.ViewportSize.X/2, S.C.ViewportSize.Y)
-            e.T.To = U.V2(x, y - hx/3)
-            e.T.Color = bc
-            e.T.Visible = G.E
-        end
-        
-        if G.SK.E then US(e, c) end
+        if G.SK then US(e, c) end
     end
 
     local function CL()
@@ -334,8 +295,11 @@ local D = (function()
             if not p or not p.Parent or not VV(p) then
                 if C.E[p] then
                     for _, d in pairs(C.E[p]) do
-                        if type(d) == "table" then for _, sd in pairs(d) do pcall(function() sd:Remove() end) end
-                        else pcall(function() d:Remove() end) end
+                        if type(d) == "table" then
+                            for _, sd in pairs(d) do pcall(function() sd:Remove() end) end
+                        else
+                            pcall(function() d:Remove() end)
+                        end
                     end
                     C.E[p] = nil
                 end
@@ -345,79 +309,42 @@ local D = (function()
 
     local M = {}
 
-    function M.Enable()
-        G.E = true
+    function M.Enable() G.E = true end
+    function M.Disable() G.E = false end
+    function M.Toggle() G.E = not G.E end
+    function M.IsEnabled() return G.E end
+    
+    function M.SetState(k, v) if G[k] ~= nil then G[k] = v end end
+    function M.SetBoxColor(c) G.BC = P[c] or P.White end
+    function M.SetHeadColor(c) G.HC = P[c] or P.White end
+    function M.SetFOVColor(c) G.FC = P[c] or P.White if C.F then pcall(function() C.F.Color = G.FC end) end end
+    function M.SetBoxScale(v) G.BS = v end
+    function M.SetBoxThickness(v) G.BT = v end
+    function M.SetFOVRadius(v) G.FR = v if C.F then pcall(function() C.F.Radius = v end) end end
+    function M.SetFOVThickness(v) G.FT = v if C.F then pcall(function() C.F.Thickness = v end) end end
+
+    function M.InitFOV()
         if not C.F then
             C.F = DR("Circle", {
-                R = G.R,
-                C = P.FOV,
-                T = 1.25,
-                NS = 72,
-                F = false,
-                TR = 0.85,
-                V = true,
-                P = VC()
+                Radius = G.FR,
+                Color = G.FC,
+                Thickness = G.FT,
+                Filled = false,
+                NumSides = 64,
+                Visible = false,
+                Position = VC()
             })
         end
     end
 
-    function M.Disable()
-        G.E = false
-        if C.F then pcall(function() C.F.Visible = false end) end
-        for p, _ in pairs(C.E) do
-            if C.E[p] then
-                for _, d in pairs(C.E[p]) do
-                    if type(d) == "table" then for _, sd in pairs(d) do pcall(function() sd.Visible = false end) end
-                    else pcall(function() d.Visible = false end) end
-                end
-            end
+    function M.ToggleFOV(v)
+        G.F = v
+        if v then
+            if not C.F then M.InitFOV() end
+            if C.F then pcall(function() C.F.Visible = true end) end
+        elseif C.F then
+            pcall(function() C.F.Visible = false end)
         end
-    end
-
-    function M.Toggle()
-        if G.E then M.Disable() else M.Enable() end
-    end
-
-    function M.SetFOV(r)
-        G.R = r or 120
-        if C.F then pcall(function() C.F.Radius = G.R end) end
-    end
-
-    function M.SetFOVColor(r,g,b)
-        P.FOV = U.C3(r,g,b)
-        if C.F then pcall(function() C.F.Color = P.FOV end) end
-    end
-
-    function M.ToggleCorner(e)
-        G.C.E = e ~= nil and e or not G.C.E
-    end
-
-    function M.ToggleTracer(e)
-        G.TR.E = e ~= nil and e or not G.TR.E
-    end
-
-    function M.ToggleHead(e)
-        G.H.E = e ~= nil and e or not G.H.E
-    end
-
-    function M.ToggleSkeleton(e)
-        G.SK.E = e ~= nil and e or not G.SK.E
-    end
-
-    function M.ToggleHealthBar(e)
-        G.B.HB = e ~= nil and e or not G.B.HB
-    end
-
-    function M.ToggleName(e)
-        G.B.NT = e ~= nil and e or not G.B.NT
-    end
-
-    function M.ToggleDistance(e)
-        G.B.D = e ~= nil and e or not G.B.D
-    end
-
-    function M.ToggleTeamColor(e)
-        G.B.TC = e ~= nil and e or not G.B.TC
     end
 
     function M.Reset()
@@ -425,15 +352,11 @@ local D = (function()
         C.D = {}; C.E = {}; C.F = nil
     end
 
-    function M.IsEnabled()
-        return G.E
-    end
-
-    S.RS.RenderStepped:Connect(function()
+    function M.Update()
         if not S.C then S.C = S.WS.CurrentCamera end
         if not S.C then return end
         
-        if C.F and G.E then
+        if C.F and G.F then
             pcall(function() C.F.Position = VC(); C.F.Visible = true end)
         elseif C.F then
             pcall(function() C.F.Visible = false end)
@@ -445,11 +368,11 @@ local D = (function()
             end
             CL()
         end
-    end)
+    end
+
+    S.RS.RenderStepped:Connect(function() M.Update() end)
 
     return M
 end)()
 
-_G.ARC = _G.ARC or {}
-_G.ARC.Visual = D
-return D
+return DrawingLib
