@@ -1,0 +1,353 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local DrawingLib = loadstring(game:HttpGet('https://raw.githubusercontent.com/xdpoc/Arc-Client/refs/heads/main/drawing.lib'))()
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+local UIS = game:GetService("UserInputService")
+
+local Env = DrawingLib
+Env.G = false
+
+local function w2v(p)
+	local v = Camera:WorldToViewportPoint(p)
+	return Vector2.new(v.X, v.Y), v.Z, v[3]
+end
+
+local Window = Rayfield:CreateWindow({
+	Name = "Arc Client Changelogs",
+	LoadingTitle = "Arc Client",
+	LoadingSubtitle = "by mqp6/developer",
+	ConfigurationSaving = {
+		Enabled = true,
+		FolderName = "ArcClient",
+		FileName = "Config"
+	},
+	Discord = {
+		Enabled = true,
+		Invite = "rmpQfYtnWd",
+		RememberJoins = true
+	},
+	KeySystem = true,
+	KeySettings = {
+		Title = "Arc Client | Key System",
+		Subtitle = "Key Required",
+		Note = "Join Discord for key",
+		FileName = "ArcKey",
+		SaveKey = true,
+		GrabKeyFromSite = false,
+		Key = {"ArcClient2024", "TestKey123"}
+	}
+})
+
+local InfoTab = Window:CreateTab("Info", 4483362458)
+InfoTab:CreateSection("Credits & Links")
+InfoTab:CreateLabel("mqp6/developer")
+InfoTab:CreateLabel("discord.gg/rmpQfYtnWd")
+
+InfoTab:CreateButton({
+	Name = "Copy Discord",
+	Callback = function()
+		setclipboard("https://discord.gg/rmpQfYtnWd")
+		Rayfield:Notify({
+			Title = "Copied",
+			Content = "discord.gg/rmpQfYtnWd",
+			Duration = 2,
+			Image = 4483362458
+		})
+	end
+})
+
+InfoTab:CreateButton({
+	Name = "Join Server",
+	Callback = function()
+		local req = syn and syn.request or http_request or request
+		if req then
+			req({
+				Url = "http://127.0.0.1:6463/rpc?v=1",
+				Method = "POST",
+				Headers = {
+					["Content-Type"] = "application/json",
+					Origin = "https://discord.com"
+				},
+				Body = game:GetService("HttpService"):JSONEncode({
+					cmd = "INVITE_BROWSER",
+					args = {code = "rmpQfYtnWd"},
+					nonce = tostring(math.random(1e6, 1e7))
+				})
+			})
+		end
+	end
+})
+
+local CombatTab = Window:CreateTab("Combat", 4483362458)
+CombatTab:CreateSection("Combat Features")
+CombatTab:CreateLabel("Pending development")
+
+local VisualsTab = Window:CreateTab("Visuals", 4483362458)
+
+local T = {
+	m = false, b = false, c = false, t = false, hd = false, n = false,
+	hb = false, ht = false, d = false, s = false, f = false,
+	fr = 150, ft = 1, bc = Color3.fromRGB(255,255,255), hc = Color3.fromRGB(255,255,255),
+	fc = Color3.fromRGB(255,255,255), bs = 1.0, bt = 1
+}
+
+local COL = {
+	White = Color3.fromRGB(255,255,255), Red = Color3.fromRGB(255,70,70),
+	Green = Color3.fromRGB(70,255,120), Blue = Color3.fromRGB(70,70,255),
+	Yellow = Color3.fromRGB(255,220,70), Purple = Color3.fromRGB(255,70,255),
+	Cyan = Color3.fromRGB(70,255,255), Orange = Color3.fromRGB(255,140,70)
+}
+
+VisualsTab:CreateSection("System")
+VisualsTab:CreateToggle({
+	Name = "ESP",
+	CurrentValue = false,
+	Flag = "ESP",
+	Callback = function(v) T.m = v Env.G = v end
+})
+
+VisualsTab:CreateSection("ESP Type")
+VisualsTab:CreateToggle({ Name = "Box", CurrentValue = false, Flag = "Box", Callback = function(v) T.b = v end })
+VisualsTab:CreateToggle({ Name = "Corner", CurrentValue = false, Flag = "Corner", Callback = function(v) T.c = v end })
+VisualsTab:CreateToggle({ Name = "Tracer", CurrentValue = false, Flag = "Tracer", Callback = function(v) T.t = v end })
+VisualsTab:CreateToggle({ Name = "Head Dot", CurrentValue = false, Flag = "Head", Callback = function(v) T.hd = v end })
+VisualsTab:CreateToggle({ Name = "Name", CurrentValue = false, Flag = "Name", Callback = function(v) T.n = v end })
+VisualsTab:CreateToggle({ Name = "Health Bar", CurrentValue = false, Flag = "Health", Callback = function(v) T.hb = v end })
+VisualsTab:CreateToggle({ Name = "Health Text", CurrentValue = false, Flag = "HealthText", Callback = function(v) T.ht = v end })
+VisualsTab:CreateToggle({ Name = "Distance", CurrentValue = false, Flag = "Distance", Callback = function(v) T.d = v end })
+VisualsTab:CreateToggle({ Name = "Skeleton", CurrentValue = false, Flag = "Skeleton", Callback = function(v) T.s = v end })
+
+VisualsTab:CreateSection("FOV")
+VisualsTab:CreateToggle({
+	Name = "FOV Circle",
+	CurrentValue = false,
+	Flag = "FOV",
+	Callback = function(v)
+		T.f = v
+		if v then
+			if not Env.F then
+				Env.F = Drawing.new("Circle")
+				Env.F.Radius = T.fr
+				Env.F.Color = T.fc
+				Env.F.Thickness = T.ft
+				Env.F.Filled = false
+				Env.F.NumSides = 64
+				Env.F.Visible = true
+			else
+				Env.F.Visible = true
+			end
+		elseif Env.F then
+			Env.F.Visible = false
+		end
+	end
+})
+
+VisualsTab:CreateSlider({ Name = "Radius", Range = {50,500}, Increment = 10, Suffix = "px", CurrentValue = 150, Flag = "FOVRadius", Callback = function(v) T.fr = v if Env.F then Env.F.Radius = v end end })
+VisualsTab:CreateSlider({ Name = "Thickness", Range = {1,5}, Increment = 1, Suffix = "px", CurrentValue = 1, Flag = "FOVThickness", Callback = function(v) T.ft = v if Env.F then Env.F.Thickness = v end end })
+VisualsTab:CreateDropdown({ Name = "Color", Options = {"White","Red","Green","Blue","Yellow","Purple","Cyan","Orange"}, CurrentOption = "White", Flag = "FOVColor", Callback = function(o) T.fc = COL[o] if Env.F then Env.F.Color = COL[o] end end })
+
+VisualsTab:CreateSection("Appearance")
+VisualsTab:CreateDropdown({ Name = "Box Color", Options = {"White","Red","Green","Blue","Yellow","Purple","Cyan","Orange"}, CurrentOption = "White", Flag = "BoxColor", Callback = function(o) T.bc = COL[o] end })
+VisualsTab:CreateDropdown({ Name = "Head Color", Options = {"White","Yellow","Red","Green","Blue","Purple","Cyan","Orange"}, CurrentOption = "White", Flag = "HeadColor", Callback = function(o) T.hc = COL[o] end })
+VisualsTab:CreateSlider({ Name = "Box Scale", Range = {0.5,2.0}, Increment = 0.1, Suffix = "x", CurrentValue = 1.0, Flag = "BoxScale", Callback = function(v) T.bs = v end })
+VisualsTab:CreateSlider({ Name = "Box Thickness", Range = {0.5,3}, Increment = 0.25, Suffix = "px", CurrentValue = 1, Flag = "BoxThickness", Callback = function(v) T.bt = v end })
+
+VisualsTab:CreateSection("Utility")
+VisualsTab:CreateButton({
+	Name = "Clear",
+	Callback = function()
+		for _, d in pairs(Env.D) do pcall(function() d:Remove() end) end
+		Env.D = {}
+		Env.E = {}
+		if Env.F then pcall(function() Env.F:Remove() end) Env.F = nil end
+		T.f = false
+	end
+})
+
+UIS.InputBegan:Connect(function(i, g)
+	if not g and i.KeyCode == Enum.KeyCode.F1 then
+		T.m = not T.m
+		Env.G = T.m
+		Rayfield:Notify({
+			Title = "ESP",
+			Content = T.m and "Enabled" or "Disabled",
+			Duration = 1
+		})
+	end
+end)
+
+RunService.RenderStepped:Connect(function()
+	if Env.F and T.f and Camera then
+		Env.F.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+	end
+	
+	if not T.m then
+		for _, p in pairs(Env.E) do
+			for _, d in pairs(p) do
+				if type(d) == "table" then
+					for _, sd in pairs(d) do pcall(function() sd.Visible = false end) end
+				else
+					pcall(function() d.Visible = false end)
+				end
+			end
+		end
+		return
+	end
+	
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+			local char = player.Character
+			local hum = char:FindFirstChild("Humanoid")
+			local root = char:FindFirstChild("HumanoidRootPart")
+			
+			if root and hum and hum.Health > 0 then
+				local pos, depth, vis = w2v(root.Position)
+				if vis then
+					local esp = Env.E[player]
+					if not esp then
+						esp = Env.construct_player_esp(player)
+						Env.E[player] = esp
+					end
+					
+					if esp then
+						local scale = math.clamp(600 / (depth + 0.01), 0.6, 2.5) * T.bs
+						local w = math.floor(45 * scale)
+						local h = math.floor(90 * scale)
+						local x, y = pos.X, pos.Y
+						
+						if T.b and esp.box and esp.box_outline then
+							esp.box.Position = Vector2.new(x - w/2, y - h/2)
+							esp.box.Size = Vector2.new(w, h)
+							esp.box.Color = T.bc
+							esp.box.Thickness = T.bt
+							esp.box.Visible = true
+							
+							esp.box_outline.Position = Vector2.new(x - w/2 - 1, y - h/2 - 1)
+							esp.box_outline.Size = Vector2.new(w + 2, h + 2)
+							esp.box_outline.Thickness = T.bt + 1
+							esp.box_outline.Visible = true
+						else
+							if esp.box then esp.box.Visible = false end
+							if esp.box_outline then esp.box_outline.Visible = false end
+						end
+						
+						if T.c then
+							Env.update_corners(esp, x, y, w, h)
+						else
+							for i = 1, 8 do
+								if esp["corner_"..i] then
+									esp["corner_"..i].Visible = false
+								end
+							end
+						end
+						
+						if T.t and esp.tracer then
+							esp.tracer.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
+							esp.tracer.To = Vector2.new(x, y)
+							esp.tracer.Color = T.bc
+							esp.tracer.Visible = true
+						elseif esp.tracer then
+							esp.tracer.Visible = false
+						end
+						
+						if T.hd and char:FindFirstChild("Head") and esp.head then
+							local head = char.Head
+							local hpos, hvis = w2v(head.Position)
+							if hvis then
+								esp.head.Position = Vector2.new(hpos.X, hpos.Y)
+								esp.head.Color = T.hc
+								esp.head.Visible = true
+							else
+								esp.head.Visible = false
+							end
+						elseif esp.head then
+							esp.head.Visible = false
+						end
+						
+						if T.n and esp.name then
+							esp.name.Position = Vector2.new(x, y - h/2 - 22)
+							esp.name.Text = string.upper(player.Name)
+							esp.name.Visible = true
+						elseif esp.name then
+							esp.name.Visible = false
+						end
+						
+						if T.hb and esp.health_bg and esp.health_fill and hum then
+							local hp = hum.Health
+							local max = hum.MaxHealth
+							local pct = math.clamp(hp / max, 0, 1)
+							
+							esp.health_bg.Position = Vector2.new(x + w/2 + 5, y - h/2)
+							esp.health_bg.Size = Vector2.new(5, h)
+							esp.health_bg.Visible = true
+							
+							esp.health_fill.Position = Vector2.new(x + w/2 + 5, y + h/2 - (h * pct))
+							esp.health_fill.Size = Vector2.new(5, h * pct)
+							esp.health_fill.Color = pct > 0.6 and Color3.fromRGB(70,255,70) or pct > 0.3 and Color3.fromRGB(255,220,70) or Color3.fromRGB(255,70,70)
+							esp.health_fill.Visible = true
+							
+							if T.ht then
+								if not esp.health_text then
+									esp.health_text = Env.safe_draw("Text", {
+										Text = "", Color = Color3.fromRGB(255,255,255), Size = 12,
+										Center = true, Outline = true, OutlineColor = Color3.fromRGB(0,0,0)
+									})
+								end
+								esp.health_text.Position = Vector2.new(x + w/2 + 12, y)
+								esp.health_text.Text = math.floor(hp) .. "/" .. math.floor(max)
+								esp.health_text.Visible = true
+							elseif esp.health_text then
+								esp.health_text.Visible = false
+							end
+						else
+							if esp.health_bg then esp.health_bg.Visible = false end
+							if esp.health_fill then esp.health_fill.Visible = false end
+							if esp.health_text then esp.health_text.Visible = false end
+						end
+						
+						if T.d and esp.distance and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+							local lr = LocalPlayer.Character.HumanoidRootPart
+							local dist = math.floor((lr.Position - root.Position).Magnitude)
+							esp.distance.Position = Vector2.new(x, y + h/2 + 20)
+							esp.distance.Text = dist .. "M"
+							esp.distance.Visible = true
+						elseif esp.distance then
+							esp.distance.Visible = false
+						end
+						
+						if T.s and esp.skeleton then
+							Env.update_skeleton(player, esp, char)
+						elseif esp.skeleton then
+							for _, bone in pairs(esp.skeleton) do
+								pcall(function() bone.Visible = false end)
+							end
+						end
+					end
+				else
+					if Env.E[player] then
+						for _, d in pairs(Env.E[player]) do
+							if type(d) == "table" then
+								for _, sd in pairs(d) do pcall(function() sd.Visible = false end) end
+							else
+								pcall(function() d.Visible = false end)
+							end
+						end
+					end
+				end
+			else
+				if Env.E[player] then
+					for _, d in pairs(Env.E[player]) do
+						if type(d) == "table" then
+							for _, sd in pairs(d) do pcall(function() sd.Visible = false end) end
+						else
+							pcall(function() d.Visible = false end)
+						end
+					end
+				end
+			end
+		end
+	end
+end)
