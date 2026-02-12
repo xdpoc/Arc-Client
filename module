@@ -1,433 +1,1312 @@
-local L = {}
-do
-    local P = game:GetService("Players")
-    local RS = game:GetService("RunService")
-    local UIS = game:GetService("UserInputService")
-    local WS = game:GetService("Workspace")
-    local C = WS.CurrentCamera
-    local LP = P.LocalPlayer
-    local V = game:GetService("VirtualInputManager")
-    local HC = game:GetService("HttpService")
-    
-    local mt = getrawmetatable(game)
-    local old = mt.__namecall
-    setreadonly(mt, false)
-    
-    local function v3(x,y,z) return Vector3.new(x or 0,y or 0,z or 0) end
-    local function v2(x,y) return Vector2.new(x or 0,y or 0) end
-    
-    local function a(p)
-        return p and p.Parent and P:FindFirstChild(p.Parent.Name) and 
-               p.Parent:FindFirstChild("Humanoid") and 
-               p.Parent.Humanoid.Health > 0 and
-               p.Parent:FindFirstChild("HumanoidRootPart")
-    end
-    
-    local function ghr(p)
-        return p.Character and p.Character:FindFirstChild("HumanoidRootPart")
-    end
-    
-    local function gp(c,n)
-        return c and (c:FindFirstChild(n) or c:FindFirstChild("HumanoidRootPart"))
-    end
-    
-    local function w2s(p)
-        local v, vis = C:WorldToViewportPoint(p)
-        return v2(v.X, v.Y), v.Z, vis
-    end
-    
-    local aim = {
-        on = false,
-        f = 200,
-        b = "Head",
-        s = 0.18,
-        p = 0.22,
-        v = true,
-        d = 0.25,
-        ac = true,
-        aa = 0.35,
-        ab = 0.15,
-        am = 0.2,
-        ah = 0.28,
-        al = 0.32,
-        az = 0.12,
-        ao = 0.18
+local L = (function()
+    local S = {
+        P = game:GetService("Players"),
+        RS = game:GetService("RunService"),
+        UIS = game:GetService("UserInputService"),
+        WS = game:GetService("Workspace"),
+        V = game:GetService("VirtualInputManager"),
+        HC = game:GetService("HttpService"),
+        T = game:GetService("TweenService"),
+        SG = game:GetService("Stats"),
+        CS = game:GetService("CollectionService"),
+        TS = game:GetService("TeleportService"),
+        R = game:GetService("ReplicatedStorage"),
+        L = game:GetService("Lighting")
     }
     
-    function aim:gv(t)
-        local hrp = t.Parent and t.Parent:FindFirstChild("HumanoidRootPart")
-        return hrp and hrp.AssemblyLinearVelocity or v3()
+    S.C = S.WS.CurrentCamera
+    S.LP = S.P.LocalPlayer
+    S.G = S.WS.Gravity
+    
+    local M = getrawmetatable(game)
+    local O = M.__namecall
+    setreadonly(M, false)
+    
+    local CACHE = {
+        Players = {},
+        Characters = {},
+        Roots = {},
+        Parts = {},
+        Velocities = {},
+        Rays = {},
+        Frames = 0,
+        Delta = 0,
+        Tick = 0
+    }
+    
+    local U = {
+        V3 = function(x,y,z) return Vector3.new(x or 0, y or 0, z or 0) end,
+        V2 = function(x,y) return Vector2.new(x or 0, y or 0) end,
+        CF = function(p,l) return CFrame.lookAt(p or U.V3(), l or U.V3()) end,
+        CL = function(n, l) return math.clamp(n, l or 0, l or 1) end,
+        R = function(n) return math.rad(n or 0) end,
+        D = function(v) return v and v.Magnitude or 0 end,
+        L = function(t) return typeof(t) == "Instance" and t or nil end,
+        T = function(t) return typeof(t) end,
+        C = Color3.new,
+        CRC = Color3.fromRGB,
+        HCK = tick,
+        RNG = math.random,
+        ABS = math.abs,
+        FLR = math.floor,
+        CE = math.ceil,
+        PI = math.pi,
+        SIN = math.sin,
+        COS = math.cos,
+        TAN = math.tan,
+        ASIN = math.asin,
+        ACOS = math.acos,
+        ATAN2 = math.atan2,
+        MIN = math.min,
+        MAX = math.max,
+        POW = math.pow,
+        SQRT = math.sqrt,
+        BAND = bit32.band,
+        BOR = bit32.bor,
+        BXOR = bit32.bxor,
+        BNOT = bit32.bnot,
+        LSHIFT = bit32.lshift,
+        RSHIFT = bit32.rshift
+    }
+    
+    local function V(p)
+        local s, e = pcall(function()
+            return p and p.Parent and S.P:FindFirstChild(p.Parent.Name) and
+                   p.Parent:FindFirstChild("Humanoid") and
+                   p.Parent.Humanoid.Health > 0 and
+                   p.Parent:FindFirstChild("HumanoidRootPart") and
+                   p.Parent.HumanoidRootPart.Parent == p.Parent
+        end)
+        return s and e
     end
     
-    function aim:gt()
-        local center = v2(C.ViewportSize.X/2, C.ViewportSize.Y/2)
-        local close, dist = nil, self.f
-        for _,pl in pairs(P:GetPlayers()) do
-            if pl ~= LP and a(pl) then
-                local r = ghr(pl)
+    local function GHR(p)
+        if not p then return nil end
+        if CACHE.Roots[p] and CACHE.Roots[p].Parent == p.Character then
+            return CACHE.Roots[p]
+        end
+        local r = p.Character and p.Character:FindFirstChild("HumanoidRootPart")
+        if r then CACHE.Roots[p] = r end
+        return r
+    end
+    
+    local function GP(c, n)
+        if not c then return nil end
+        local key = c.Name .. (n or "Head")
+        if CACHE.Parts[key] and CACHE.Parts[key].Parent == c then
+            return CACHE.Parts[key]
+        end
+        local p = c:FindFirstChild(n) or c:FindFirstChild("HumanoidRootPart")
+        if p then CACHE.Parts[key] = p end
+        return p
+    end
+    
+    local function W2S(p)
+        local v, vis = S.C:WorldToViewportPoint(p)
+        return U.V2(v.X, v.Y), v.Z, vis
+    end
+    
+    local function W2R(p)
+        local v, vis = S.C:WorldToScreenPoint(p)
+        return U.V2(v.X, v.Y), vis
+    end
+    
+    local function GFD()
+        return 1 / (CACHE.Delta + 0.000001)
+    end
+    
+    local function GPI()
+        return S.SG.Network.ServerStatsItem["Data Ping"]:GetValue()
+    end
+    
+    local function GPS()
+        return U.HCK()
+    end
+    
+    local function GVP(p, t)
+        local hist = CACHE.Velocities[p] or {}
+        table.insert(hist, {pos = t.Position, time = GPS()})
+        if #hist > 12 then table.remove(hist, 1) end
+        CACHE.Velocities[p] = hist
+        
+        if #hist >= 2 then
+            local v1, v2 = hist[#hist-1], hist[#hist]
+            local dt = v2.time - v1.time
+            if dt > 0 then
+                return (v2.pos - v1.pos) / dt
+            end
+        end
+        return U.V3()
+    end
+    
+    local function GCT(threshold, tc, fc)
+        local center = U.V2(S.C.ViewportSize.X/2, S.C.ViewportSize.Y/2)
+        local closest, dist = nil, threshold or 180
+        for _, p in ipairs(S.P:GetPlayers()) do
+            if p ~= S.LP and V(p) then
+                if tc and p.Team == S.LP.Team then continue end
+                if fc and not fc(p) then continue end
+                local r = GHR(p)
                 if r then
-                    local pos, _, vis = w2s(r.Position)
+                    local pos, _, vis = W2S(r.Position)
                     if vis then
                         local mag = (pos - center).Magnitude
                         if mag < dist then
-                            close, dist = pl, mag
+                            closest, dist = p, mag
                         end
                     end
                 end
             end
         end
-        return close
+        return closest
     end
     
-    function aim:gp(t)
-        local base = t.Position
-        local vel = self:gv(t)
-        local dist = (C.CFrame.Position - base).Magnitude
-        local mul = self.p
-        
-        if dist > 180 then mul = self.aa
-        elseif dist > 140 then mul = self.ab
-        elseif dist > 100 then mul = self.am
-        elseif dist > 70 then mul = self.ah
-        elseif dist > 40 then mul = self.al
-        elseif dist < 20 then mul = self.az
-        else mul = self.ao end
-        
-        return base + vel * mul
-    end
-    
-    function aim:up()
-        if not self.on then return end
-        
-        if not UIS.TouchEnabled then return end
-        local touches = UIS:GetTouchInputs()
-        if #touches == 0 then return end
-        
-        local t = self:gt()
-        if not t then return end
-        
-        local part = gp(t.Character, self.b)
-        if not part then return end
-        
-        if self.v then
-            local p = RaycastParams.new()
-            p.FilterDescendantsInstances = {t.Character, LP.Character}
-            p.FilterType = Enum.RaycastFilterType.Blacklist
-            local ray = WS:Raycast(C.CFrame.Position, (part.Position - C.CFrame.Position).Unit * 500, p)
-            if ray then return end
-        end
-        
-        local pos = self:gp(part)
-        local vec, vis = w2s(pos)
-        
-        if vis then
-            local center = v2(C.ViewportSize.X/2, C.ViewportSize.Y/2)
-            local delta = v2(vec.X, vec.Y) - center
-            local move = delta * self.s * 0.018
-            
-            V:SendMouseMoveEvent(move.X, move.Y)
-            
-            if self.ac then
-                local look = CFrame.lookAt(C.CFrame.Position, pos)
-                C.CFrame = C.CFrame:Lerp(look, self.s * 0.5)
-            end
-        end
-    end
-    
-    local trig = {
-        on = false,
-        f = 65,
-        d = 0.025,
-        b = 3,
-        bd = 0.012,
-        v = true,
-        p = 0.18,
-        h = 92,
-        c = false,
-        cd = 0.4
-    }
-    
-    function trig:up()
-        if not self.on then return end
-        if not UIS.TouchEnabled then return end
-        
-        local touches = UIS:GetTouchInputs()
-        if #touches == 0 then return end
-        
-        if math.random(1,100) > self.h then return end
-        
-        local t = aim:gt()
-        if not t then return end
-        
-        local part = gp(t.Character, "Head")
-        if not part then return end
-        
-        if self.v then
-            local p = RaycastParams.new()
-            p.FilterDescendantsInstances = {t.Character, LP.Character}
-            p.FilterType = Enum.RaycastFilterType.Blacklist
-            local ray = WS:Raycast(C.CFrame.Position, (part.Position - C.CFrame.Position).Unit * 500, p)
-            if ray then return end
-        end
-        
-        task.wait(self.d)
-        
-        for i = 1, self.b do
-            V:SendMouseButtonEvent(0, 0, 0, true, game, 1)
-            task.wait(self.bd)
-            V:SendMouseButtonEvent(0, 0, 0, false, game, 1)
-            if i < self.b then
-                task.wait(self.bd)
-            end
-        end
-        
-        if self.c then
-            task.wait(self.cd)
-        end
-    end
-    
-    local silent = {
-        on = false,
-        hc = 88,
-        b = "Head",
-        f = 210,
-        v = true,
-        p = 0.22,
-        d = 0.1,
-        g = workspace.Gravity,
-        w = false
-    }
-    
-    function silent:gt()
-        if not self.on then return nil end
-        local center = v2(C.ViewportSize.X/2, C.ViewportSize.Y/2)
-        local close, dist = nil, self.f
-        for _,pl in pairs(P:GetPlayers()) do
-            if pl ~= LP and a(pl) then
-                local r = ghr(pl)
+    local function GCM(threshold, tc, fc)
+        local mpos = U.V2(S.UIS:GetMouseLocation().X, S.UIS:GetMouseLocation().Y)
+        local closest, dist = nil, threshold or 200
+        for _, p in ipairs(S.P:GetPlayers()) do
+            if p ~= S.LP and V(p) then
+                if tc and p.Team == S.LP.Team then continue end
+                if fc and not fc(p) then continue end
+                local r = GHR(p)
                 if r then
-                    local pos, _, vis = w2s(r.Position)
+                    local pos, _, vis = W2S(r.Position)
                     if vis then
-                        local mag = (pos - center).Magnitude
+                        local mag = (pos - mpos).Magnitude
                         if mag < dist then
-                            close, dist = pl, mag
+                            closest, dist = p, mag
                         end
                     end
                 end
             end
         end
-        if close then
-            local part = gp(close.Character, self.b)
-            if part then
-                local vis = true
-                if self.v then
-                    local p = RaycastParams.new()
-                    p.FilterDescendantsInstances = {close.Character, LP.Character}
-                    p.FilterType = Enum.RaycastFilterType.Blacklist
-                    local ray = WS:Raycast(C.CFrame.Position, (part.Position - C.CFrame.Position).Unit * 500, p)
-                    vis = ray == nil
-                end
-                if vis then
-                    if self.w then
-                        local p = RaycastParams.new()
-                        p.FilterDescendantsInstances = {LP.Character, close.Character}
-                        p.FilterType = Enum.RaycastFilterType.Blacklist
-                        local ray = WS:Raycast(C.CFrame.Position, (part.Position - C.CFrame.Position).Unit * 500, p)
-                        if ray then return nil end
+        return closest
+    end
+    
+    local function GCTB(threshold, tc, bone, fc)
+        local center = U.V2(S.C.ViewportSize.X/2, S.C.ViewportSize.Y/2)
+        local closest, dist = nil, threshold or 180
+        for _, p in ipairs(S.P:GetPlayers()) do
+            if p ~= S.LP and p.Character then
+                if tc and p.Team == S.LP.Team then continue end
+                if fc and not fc(p) then continue end
+                local target = GP(p.Character, bone) or GHR(p)
+                if target then
+                    local pos, _, vis = W2S(target.Position)
+                    if vis then
+                        local mag = (pos - center).Magnitude
+                        if mag < dist then
+                            closest, dist = p, mag
+                        end
                     end
-                    local vel = part.AssemblyLinearVelocity
-                    local pos = part.Position + vel * self.p
-                    local dist = (C.CFrame.Position - part.Position).Magnitude
-                    local grav = v3(0, -self.g * self.d * dist * 0.0005, 0)
-                    return pos + grav
                 end
             end
         end
-        return nil
+        return closest
     end
     
-    local hb = {
-        on = false,
-        s = 1.45,
-        h = 1.4,
-        t = 1.5,
-        a = 1.35,
-        l = 1.25,
-        r = 1.3,
-        ls = 1.2,
-        rs = 1.2,
-        ll = 1.15,
-        rl = 1.15,
-        enabled = false
+    local FC = {
+        Enabled = false,
+        Filter = nil,
+        Whitelist = {},
+        Blacklist = {},
+        Priority = {}
     }
     
-    function hb:apply()
-        if not self.on then return end
-        for _,pl in pairs(P:GetPlayers()) do
-            if pl ~= LP and pl.Character then
-                local hrp = pl.Character:FindFirstChild("HumanoidRootPart")
+    local function FP(p)
+        if not FC.Enabled then return true end
+        if FC.Whitelist and #FC.Whitelist > 0 then
+            for _, v in ipairs(FC.Whitelist) do
+                if v == p.Name or v == p.UserId or v == p then return true end
+            end
+            return false
+        end
+        if FC.Blacklist and #FC.Blacklist > 0 then
+            for _, v in ipairs(FC.Blacklist) do
+                if v == p.Name or v == p.UserId or v == p then return false end
+            end
+        end
+        return FC.Filter and FC.Filter(p) or true
+    end
+    
+    local PB = {
+        Enabled = false,
+        Mode = "Static",
+        Gravity = S.G,
+        Drag = 0.001,
+        Wind = false,
+        WindVector = U.V3(),
+        VelocityInheritance = 0.5,
+        Accuracy = 1,
+        Iterations = 5,
+        TimeStep = 0.01
+    }
+    
+    local function CPB(pos, vel, time, drag, grav)
+        local p = pos
+        local v = vel
+        local t = time or 0.15
+        local d = drag or PB.Drag
+        local g = grav or PB.Gravity
+        
+        if PB.Mode == "Ballistic" then
+            for i = 1, PB.Iterations do
+                local dt = t / PB.Iterations
+                v = v - v * d * dt
+                v = v - U.V3(0, g * dt, 0)
+                p = p + v * dt
+            end
+            if PB.Wind then
+                p = p + PB.WindVector * t * 0.5
+            end
+            return p
+        else
+            return pos + vel * t
+        end
+    end
+    
+    local FPModule = {
+        Enabled = false,
+        Method = "Residual",
+        Samples = 10,
+        Confidence = 0.75,
+        History = {}
+    }
+    
+    local function FPP(p, t)
+        if not FPModule.Enabled then return t.Position end
+        local hist = FPModule.History[p] or {}
+        table.insert(hist, {pos = t.Position, vel = t.AssemblyLinearVelocity, time = GPS()})
+        if #hist > FPModule.Samples then table.remove(hist, 1) end
+        FPModule.History[p] = hist
+        
+        if #hist < 3 then return CPB(t.Position, t.AssemblyLinearVelocity, 0.15) end
+        
+        if FPModule.Method == "Average" then
+            local sum = U.V3()
+            for i = #hist-2, #hist do
+                sum = sum + hist[i].vel
+            end
+            return CPB(t.Position, sum / 3, 0.15)
+        elseif FPModule.Method == "Residual" then
+            local v1, v2, v3 = hist[#hist-2].vel, hist[#hist-1].vel, hist[#hist].vel
+            local a = (v3 - v2) - (v2 - v1)
+            local pv = v3 + a * 0.5
+            return CPB(t.Position, pv, 0.15)
+        else
+            return CPB(t.Position, t.AssemblyLinearVelocity, 0.15)
+        end
+    end
+    
+    local SIL = {
+        Enabled = false,
+        Chance = 92,
+        Bone = "Head",
+        FOV = 195,
+        TeamCheck = true,
+        VisibleCheck = true,
+        WallCheck = false,
+        Prediction = 0.18,
+        Drop = 0.08,
+        Gravity = S.G,
+        Resolver = false,
+        Priority = "Crosshair",
+        Filter = FC,
+        Ballistics = PB,
+        FramePrediction = FPModule,
+        AutoWall = false,
+        AutoWallPenetration = 0.5,
+        AutoWallDistance = 200,
+        Bypass = false,
+        BypassMethod = "Raycast",
+        Silent = true,
+        TargetPart = "Head",
+        MultiPoint = false,
+        MultiPointParts = {"Head", "HumanoidRootPart", "Torso", "UpperTorso"},
+        HitchanceMode = "Dynamic",
+        HitchanceDynamic = {Min = 75, Max = 98, DistanceFactor = 0.2},
+        ResolverMode = "Delta",
+        ResolverDelta = {Pitch = 0, Yaw = 0, Roll = 0}
+    }
+    
+    function SIL:GetTarget()
+        if not self.Enabled then return nil end
+        
+        local target = nil
+        if self.Priority == "Crosshair" then
+            target = GCTB(self.FOV, self.TeamCheck, self.Bone, FP)
+        elseif self.Priority == "Mouse" then
+            target = GCM(self.FOV, self.TeamCheck, FP)
+        elseif self.Priority == "Distance" then
+            local closest, dist = nil, math.huge
+            for _, p in ipairs(S.P:GetPlayers()) do
+                if p ~= S.LP and V(p) and (not self.TeamCheck or p.Team ~= S.LP.Team) and FP(p) then
+                    local r = GHR(p)
+                    if r then
+                        local d = (S.C.CFrame.Position - r.Position).Magnitude
+                        if d < dist then
+                            closest, dist = p, d
+                        end
+                    end
+                end
+            end
+            target = closest
+        elseif self.Priority == "Health" then
+            local lowest, health = nil, math.huge
+            for _, p in ipairs(S.P:GetPlayers()) do
+                if p ~= S.LP and V(p) and (not self.TeamCheck or p.Team ~= S.LP.Team) and FP(p) then
+                    local h = p.Character.Humanoid.Health
+                    if h < health then
+                        lowest, health = p, h
+                    end
+                end
+            end
+            target = lowest
+        end
+        
+        if not target then return nil end
+        
+        local part = nil
+        if self.MultiPoint then
+            for _, bone in ipairs(self.MultiPointParts) do
+                part = GP(target.Character, bone)
+                if part then break end
+            end
+        else
+            part = GP(target.Character, self.Bone)
+        end
+        
+        if not part then return nil end
+        
+        if self.VisibleCheck then
+            local params = RaycastParams.new()
+            params.FilterDescendantsInstances = {target.Character, S.LP.Character}
+            params.FilterType = Enum.RaycastFilterType.Blacklist
+            local ray = S.WS:Raycast(S.C.CFrame.Position, (part.Position - S.C.CFrame.Position).Unit * 500, params)
+            if ray then return nil end
+        end
+        
+        if self.WallCheck then
+            local params = RaycastParams.new()
+            params.FilterDescendantsInstances = {S.LP.Character, target.Character}
+            params.FilterType = Enum.RaycastFilterType.Blacklist
+            local ray = S.WS:Raycast(S.C.CFrame.Position, (part.Position - S.C.CFrame.Position).Unit * 500, params)
+            if ray then return nil end
+        end
+        
+        if self.AutoWall then
+            local params = RaycastParams.new()
+            params.FilterDescendantsInstances = {S.LP.Character}
+            params.FilterType = Enum.RaycastFilterType.Blacklist
+            local ray = S.WS:Raycast(S.C.CFrame.Position, (part.Position - S.C.CFrame.Position).Unit * self.AutoWallDistance, params)
+            if ray then
+                local dist = (ray.Position - S.C.CFrame.Position).Magnitude
+                local pen = self.AutoWallPenetration
+                if dist > 50 then pen = pen * 0.5 end
+                if dist > 100 then pen = pen * 0.25 end
+                if dist > 150 then pen = pen * 0.1 end
+                if U.RNG(1,100) > pen * 100 then return nil end
+            end
+        end
+        
+        local pos = part.Position
+        local vel = part.AssemblyLinearVelocity
+        
+        if self.Resolver then
+            if self.ResolverMode == "Delta" then
+                local delta = self.ResolverDelta
+                pos = pos + U.V3(delta.Pitch, delta.Yaw, delta.Roll)
+            elseif self.ResolverMode == "Adaptive" then
+                local hist = CACHE.Velocities[target] or {}
+                if #hist > 5 then
+                    local avg = U.V3()
+                    for i = #hist-4, #hist do
+                        avg = avg + hist[i].vel or U.V3()
+                    end
+                    vel = avg / 5
+                end
+            end
+        end
+        
+        if self.FramePrediction.Enabled then
+            pos = FPP(target, part)
+        else
+            pos = CPB(pos, vel, self.Prediction, nil, self.Gravity)
+        end
+        
+        if self.Drop > 0 then
+            local dist = (S.C.CFrame.Position - part.Position).Magnitude
+            pos = pos - U.V3(0, self.Gravity * self.Drop * dist * 0.0005, 0)
+        end
+        
+        local hitchance = self.Chance
+        if self.HitchanceMode == "Dynamic" then
+            local dist = (S.C.CFrame.Position - part.Position).Magnitude
+            local factor = U.CL(dist / 200, 0, 1)
+            hitchance = U.FLR(U.CL(
+                self.HitchanceDynamic.Max - (self.HitchanceDynamic.Max - self.HitchanceDynamic.Min) * factor,
+                self.HitchanceDynamic.Min,
+                self.HitchanceDynamic.Max
+            ))
+        end
+        
+        return {Position = pos, Target = target, Part = part, HitChance = hitchance}
+    end
+    
+    local AIM = {
+        Enabled = false,
+        Mode = "Touch",
+        Smooth = 0.24,
+        Bone = "Head",
+        TeamCheck = true,
+        VisibleCheck = true,
+        Prediction = 0.22,
+        FOV = 185,
+        Dynamic = true,
+        Acceleration = true,
+        AccelerationFactor = 1.2,
+        DecelerationFactor = 0.8,
+        MaxSpeed = 2,
+        MinSpeed = 0.05,
+        SmoothMode = "Linear",
+        SmoothCurve = 2,
+        PredictionMode = "Adaptive",
+        PredictionAdaptive = {Min = 0.12, Max = 0.32, DistanceFactor = 0.0015},
+        TouchSensitivity = 0.65,
+        TouchFilter = 0.3,
+        TouchPrediction = true,
+        TouchDelay = 0.016,
+        TouchInterpolation = true,
+        TouchDeadzone = 5,
+        CameraLerp = true,
+        CameraLerpFactor = 0.15,
+        SilentMode = false,
+        PredictionDynamic = {
+            [0] = 0.18,
+            [30] = 0.2,
+            [60] = 0.22,
+            [90] = 0.24,
+            [120] = 0.26,
+            [150] = 0.28,
+            [180] = 0.3,
+            [210] = 0.32
+        }
+    }
+    
+    function AIM:GetPrediction(dist)
+        if not self.Dynamic then return self.Prediction end
+        
+        if self.PredictionMode == "Adaptive" then
+            local factor = U.CL(dist / 250, 0, 1)
+            return U.CL(
+                self.PredictionAdaptive.Min + (self.PredictionAdaptive.Max - self.PredictionAdaptive.Min) * factor,
+                self.PredictionAdaptive.Min,
+                self.PredictionAdaptive.Max
+            )
+        elseif self.PredictionMode == "Table" then
+            local pred = self.Prediction
+            for d, p in pairs(self.PredictionDynamic) do
+                if dist >= d then
+                    pred = p
+                end
+            end
+            return pred
+        else
+            if dist > 180 then return self.Prediction * 1.5
+            elseif dist > 140 then return self.Prediction * 1.3
+            elseif dist > 100 then return self.Prediction * 1.2
+            elseif dist > 70 then return self.Prediction * 1.1
+            elseif dist > 40 then return self.Prediction * 0.9
+            elseif dist < 20 then return self.Prediction * 0.7
+            else return self.Prediction end
+        end
+    end
+    
+    function AIM:GetSmooth(dist)
+        local smooth = self.Smooth
+        if self.Acceleration then
+            local factor = U.CL(dist / 150, 0, 1)
+            smooth = smooth * (self.DecelerationFactor + (self.AccelerationFactor - self.DecelerationFactor) * factor)
+        end
+        smooth = U.CL(smooth, self.MinSpeed, self.MaxSpeed)
+        
+        if self.SmoothMode == "Exponential" then
+            smooth = U.POW(smooth, self.SmoothCurve)
+        elseif self.SmoothMode == "Logarithmic" then
+            smooth = U.LOG(smooth + 1, self.SmoothCurve)
+        end
+        
+        return smooth
+    end
+    
+    function AIM:Update()
+        if not self.Enabled then return end
+        if not S.UIS.TouchEnabled then return end
+        
+        local touches = S.UIS:GetTouchInputs()
+        if #touches == 0 then return end
+        
+        local touch = touches[1]
+        if not touch then return end
+        
+        if self.TouchFilter > 0 then
+            if touch.Delta and U.D(touch.Delta) < self.TouchDeadzone then return end
+        end
+        
+        local target = nil
+        if self.SilentMode then
+            target = GCTB(self.FOV, self.TeamCheck, self.Bone, FP)
+        else
+            target = GCM(self.FOV, self.TeamCheck, FP)
+        end
+        
+        if not target then return end
+        
+        local part = GP(target.Character, self.Bone)
+        if not part then return end
+        
+        if self.VisibleCheck then
+            local params = RaycastParams.new()
+            params.FilterDescendantsInstances = {target.Character, S.LP.Character}
+            params.FilterType = Enum.RaycastFilterType.Blacklist
+            local ray = S.WS:Raycast(S.C.CFrame.Position, (part.Position - S.C.CFrame.Position).Unit * 500, params)
+            if ray then return end
+        end
+        
+        local dist = (S.C.CFrame.Position - part.Position).Magnitude
+        local pred = self:GetPrediction(dist)
+        local smooth = self:GetSmooth(dist)
+        
+        local pos = CPB(part.Position, part.AssemblyLinearVelocity, pred)
+        local vec, vis = W2S(pos)
+        
+        if not vis then return end
+        
+        if self.TouchPrediction then
+            if touch.Delta then
+                local delta = touch.Delta * self.TouchSensitivity * 0.5
+                vec = vec + U.V2(delta.X, delta.Y)
+            end
+        end
+        
+        if self.TouchDelay > 0 then
+            task.wait(self.TouchDelay)
+        end
+        
+        local center = U.V2(S.C.ViewportSize.X/2, S.C.ViewportSize.Y/2)
+        local delta = U.V2(vec.X, vec.Y) - center
+        local move = delta * smooth * (self.TouchSensitivity * 0.02)
+        
+        if self.TouchInterpolation and #touches > 1 then
+            move = move * 0.7
+        end
+        
+        S.V:SendMouseMoveEvent(move.X, move.Y)
+        
+        if self.CameraLerp then
+            local look = U.CF(S.C.CFrame.Position, pos)
+            S.C.CFrame = S.C.CFrame:Lerp(look, self.CameraLerpFactor)
+        end
+    end
+    
+    local TRG = {
+        Enabled = false,
+        Delay = 0.014,
+        Burst = 3,
+        BurstDelay = 0.008,
+        BurstVariation = 0.002,
+        TeamCheck = true,
+        VisibleCheck = true,
+        FOV = 70,
+        Bone = "Head",
+        Hitchance = 94,
+        HitchanceDynamic = true,
+        Prediction = 0.16,
+        TriggerMode = "Continuous",
+        TriggerDelay = 0.2,
+        TriggerDelayVariation = 0.05,
+        AutoScope = false,
+        AutoScopeMode = "Toggle",
+        AutoWall = false,
+        AutoWallMinDamage = 25,
+        WeaponCheck = false,
+        WeaponBlacklist = {},
+        WeaponWhitelist = {},
+        KillConfirmed = false,
+        KillDelay = 0.5,
+        TargetSwitching = "Smart",
+        TargetMemory = {},
+        LastTarget = nil,
+        TargetLock = false,
+        TargetLockTime = 0,
+        TargetLockDuration = 1.5,
+        AntiRecoil = false,
+        AntiRecoilAmount = 0.5,
+        AntiRecoilPattern = {0.1, 0.2, 0.3, 0.2, 0.1},
+        AntiRecoilIndex = 1
+    }
+    
+    function TRG:Update()
+        if not self.Enabled then return end
+        if not S.UIS.TouchEnabled then return end
+        
+        local touches = S.UIS:GetTouchInputs()
+        if #touches == 0 then return end
+        
+        if self.TriggerMode == "Hold" and #touches == 0 then return end
+        if self.TriggerMode == "Toggle" and not self.Toggled then return end
+        
+        local target = nil
+        if self.TargetLock and self.LastTarget and V(self.LastTarget) then
+            local dt = GPS() - self.TargetLockTime
+            if dt < self.TargetLockDuration then
+                target = self.LastTarget
+            else
+                self.TargetLock = false
+                self.LastTarget = nil
+            end
+        end
+        
+        if not target then
+            target = GCTB(self.FOV, self.TeamCheck, self.Bone, FP)
+            if target then
+                self.LastTarget = target
+                self.TargetLockTime = GPS()
+            end
+        end
+        
+        if not target then return end
+        
+        local part = GP(target.Character, self.Bone)
+        if not part then return end
+        
+        if self.VisibleCheck then
+            local params = RaycastParams.new()
+            params.FilterDescendantsInstances = {target.Character, S.LP.Character}
+            params.FilterType = Enum.RaycastFilterType.Blacklist
+            local ray = S.WS:Raycast(S.C.CFrame.Position, (part.Position - S.C.CFrame.Position).Unit * 500, params)
+            if ray then return end
+        end
+        
+        local hitchance = self.Hitchance
+        if self.HitchanceDynamic then
+            local dist = (S.C.CFrame.Position - part.Position).Magnitude
+            hitchance = U.FLR(U.CL(100 - (dist * 0.15), 60, 98))
+        end
+        
+        if U.RNG(1,100) > hitchance then return end
+        
+        if self.AutoScope then
+            self:HandleAutoScope()
+        end
+        
+        if self.AntiRecoil then
+            self:HandleAntiRecoil()
+        end
+        
+        local delay = self.Delay
+        if self.TriggerDelayVariation > 0 then
+            delay = delay + U.RNG(-self.TriggerDelayVariation * 1000, self.TriggerDelayVariation * 1000) / 1000
+        end
+        
+        task.wait(delay)
+        
+        for i = 1, self.Burst do
+            S.V:SendMouseButtonEvent(0, 0, 0, true, game, 1)
+            
+            local bd = self.BurstDelay
+            if self.BurstVariation > 0 then
+                bd = bd + U.RNG(-self.BurstVariation * 1000, self.BurstVariation * 1000) / 1000
+            end
+            
+            task.wait(bd)
+            S.V:SendMouseButtonEvent(0, 0, 0, false, game, 1)
+            
+            if i < self.Burst then
+                task.wait(self.BurstDelay)
+            end
+        end
+        
+        if self.KillConfirmed then
+            task.wait(self.KillDelay)
+            if target.Character and target.Character.Humanoid.Health <= 0 then
+                self.LastTarget = nil
+                self.TargetLock = false
+            end
+        end
+        
+        if self.TriggerMode == "Single" then
+            self.Toggled = false
+        end
+    end
+    
+    function TRG:HandleAutoScope()
+        local char = S.LP.Character
+        if not char then return end
+        
+        local tool = char:FindFirstChildOfClass("Tool")
+        if not tool then return end
+        
+        local scope = tool:FindFirstChild("Scope") or tool:FindFirstChild("WeaponScope")
+        if scope and scope:IsA("Camera") then
+            if self.AutoScopeMode == "Toggle" then
+                scope.Enabled = not scope.Enabled
+            else
+                scope.Enabled = true
+            end
+        end
+    end
+    
+    function TRG:HandleAntiRecoil()
+        local char = S.LP.Character
+        if not char then return end
+        
+        local tool = char:FindFirstChildOfClass("Tool")
+        if not tool then return end
+        
+        local pattern = self.AntiRecoilPattern
+        local index = self.AntiRecoilIndex
+        
+        if index > #pattern then index = 1 end
+        
+        local amount = pattern[index] * self.AntiRecoilAmount
+        local delta = U.V2(U.RNG(-amount, amount), U.RNG(-amount, amount))
+        
+        S.V:SendMouseMoveEvent(delta.X, delta.Y)
+        
+        self.AntiRecoilIndex = index + 1
+    end
+    
+    local HB = {
+        Enabled = false,
+        Scale = 1.65,
+        Head = 1.55,
+        Torso = 1.6,
+        Arms = 1.45,
+        Legs = 1.4,
+        LeftArm = 1.45,
+        RightArm = 1.45,
+        LeftLeg = 1.4,
+        RightLeg = 1.4,
+        Transparency = 0.85,
+        Color = Color3.fromRGB(255, 50, 50),
+        Outline = true,
+        OutlineColor = Color3.fromRGB(255, 255, 255),
+        Material = Enum.Material.Neon,
+        Collision = false,
+        ExpandMode = "Additive",
+        Visualize = true,
+        VisualizeTransparency = 0.95,
+        VisualizeColor = Color3.fromRGB(255, 0, 0),
+        Persistent = true,
+        ReapplyDelay = 0.5,
+        Exceptions = {},
+        RestoreOnDisable = true,
+        OriginalSizes = {}
+    }
+    
+    function HB:Apply()
+        if not self.Enabled then return end
+        
+        for _, p in ipairs(S.P:GetPlayers()) do
+            if p ~= S.LP and p.Character then
+                local skip = false
+                for _, ex in ipairs(self.Exceptions) do
+                    if ex == p.Name or ex == p.UserId or ex == p then
+                        skip = true
+                        break
+                    end
+                end
+                if skip then continue end
+                
+                local hrp = GHR(p)
                 if hrp then
                     if not hrp:FindFirstChild("HitboxExpander") then
-                        local s = Instance.new("SelectionBox")
-                        s.Name = "HitboxExpander"
-                        s.Adornee = hrp
-                        s.LineThickness = 0
-                        s.Transparency = 1
-                        s.Color3 = Color3.new(1,1,1)
-                        s.SurfaceColor3 = Color3.new(1,1,1)
-                        s.SurfaceTransparency = 1
-                        s.Parent = hrp
+                        local box = Instance.new("SelectionBox")
+                        box.Name = "HitboxExpander"
+                        box.Adornee = hrp
+                        box.LineThickness = 0
+                        box.Transparency = 1
+                        box.Color3 = self.Color
+                        box.SurfaceColor3 = self.Color
+                        box.SurfaceTransparency = 1
+                        box.Parent = hrp
                     end
-                    
-                    local head = pl.Character:FindFirstChild("Head")
-                    local torso = pl.Character:FindFirstChild("Torso") or pl.Character:FindFirstChild("UpperTorso")
-                    local leftarm = pl.Character:FindFirstChild("Left Arm") or pl.Character:FindFirstChild("LeftUpperArm")
-                    local rightarm = pl.Character:FindFirstChild("Right Arm") or pl.Character:FindFirstChild("RightUpperArm")
-                    local leftleg = pl.Character:FindFirstChild("Left Leg") or pl.Character:FindFirstChild("LeftUpperLeg")
-                    local rightleg = pl.Character:FindFirstChild("Right Leg") or pl.Character:FindFirstChild("RightUpperLeg")
-                    
-                    if head then
-                        head.Size = v3(2,1,1) * self.h
-                        head.Transparency = 0.8
-                        head.CanCollide = false
-                        head.Material = Enum.Material.Neon
+                end
+                
+                local head = p.Character:FindFirstChild("Head")
+                local torso = p.Character:FindFirstChild("Torso") or p.Character:FindFirstChild("UpperTorso") or p.Character:FindFirstChild("LowerTorso")
+                local leftarm = p.Character:FindFirstChild("Left Arm") or p.Character:FindFirstChild("LeftUpperArm")
+                local rightarm = p.Character:FindFirstChild("Right Arm") or p.Character:FindFirstChild("RightUpperArm")
+                local leftleg = p.Character:FindFirstChild("Left Leg") or p.Character:FindFirstChild("LeftUpperLeg")
+                local rightleg = p.Character:FindFirstChild("Right Leg") or p.Character:FindFirstChild("RightUpperLeg")
+                
+                if head then
+                    if not self.OriginalSizes[head] then
+                        self.OriginalSizes[head] = head.Size
                     end
-                    if torso then
-                        torso.Size = v3(2,2,1) * self.t
-                        torso.Transparency = 0.8
-                        torso.CanCollide = false
-                        torso.Material = Enum.Material.Neon
+                    head.Size = head.Size * self.Head * self.Scale
+                    head.Transparency = self.Transparency
+                    head.CanCollide = self.Collision
+                    head.Material = self.Material
+                    if self.Visualize then
+                        head.Transparency = self.VisualizeTransparency
+                        head.Color = self.VisualizeColor
                     end
-                    if leftarm then
-                        leftarm.Size = v3(1,2,1) * self.ls
-                        leftarm.Transparency = 0.8
-                        leftarm.CanCollide = false
-                        leftarm.Material = Enum.Material.Neon
+                end
+                
+                if torso then
+                    if not self.OriginalSizes[torso] then
+                        self.OriginalSizes[torso] = torso.Size
                     end
-                    if rightarm then
-                        rightarm.Size = v3(1,2,1) * self.rs
-                        rightarm.Transparency = 0.8
-                        rightarm.CanCollide = false
-                        rightarm.Material = Enum.Material.Neon
+                    torso.Size = torso.Size * self.Torso * self.Scale
+                    torso.Transparency = self.Transparency
+                    torso.CanCollide = self.Collision
+                    torso.Material = self.Material
+                end
+                
+                if leftarm then
+                    if not self.OriginalSizes[leftarm] then
+                        self.OriginalSizes[leftarm] = leftarm.Size
                     end
-                    if leftleg then
-                        leftleg.Size = v3(1,2,1) * self.ll
-                        leftleg.Transparency = 0.8
-                        leftleg.CanCollide = false
-                        leftleg.Material = Enum.Material.Neon
+                    leftarm.Size = leftarm.Size * self.LeftArm * self.Scale
+                    leftarm.Transparency = self.Transparency
+                    leftarm.CanCollide = self.Collision
+                    leftarm.Material = self.Material
+                end
+                
+                if rightarm then
+                    if not self.OriginalSizes[rightarm] then
+                        self.OriginalSizes[rightarm] = rightarm.Size
                     end
-                    if rightleg then
-                        rightleg.Size = v3(1,2,1) * self.rl
-                        rightleg.Transparency = 0.8
-                        rightleg.CanCollide = false
-                        rightleg.Material = Enum.Material.Neon
+                    rightarm.Size = rightarm.Size * self.RightArm * self.Scale
+                    rightarm.Transparency = self.Transparency
+                    rightarm.CanCollide = self.Collision
+                    rightarm.Material = self.Material
+                end
+                
+                if leftleg then
+                    if not self.OriginalSizes[leftleg] then
+                        self.OriginalSizes[leftleg] = leftleg.Size
                     end
+                    leftleg.Size = leftleg.Size * self.LeftLeg * self.Scale
+                    leftleg.Transparency = self.Transparency
+                    leftleg.CanCollide = self.Collision
+                    leftleg.Material = self.Material
+                end
+                
+                if rightleg then
+                    if not self.OriginalSizes[rightleg] then
+                        self.OriginalSizes[rightleg] = rightleg.Size
+                    end
+                    rightleg.Size = rightleg.Size * self.RightLeg * self.Scale
+                    rightleg.Transparency = self.Transparency
+                    rightleg.CanCollide = self.Collision
+                    rightleg.Material = self.Material
                 end
             end
         end
     end
     
-    function hb:reset()
-        for _,pl in pairs(P:GetPlayers()) do
-            if pl ~= LP and pl.Character then
-                local hrp = pl.Character:FindFirstChild("HumanoidRootPart")
+    function HB:Restore()
+        for part, size in pairs(self.OriginalSizes) do
+            if part and part.Parent then
+                pcall(function()
+                    part.Size = size
+                    part.Transparency = 0
+                    part.CanCollide = true
+                    part.Material = Enum.Material.Plastic
+                    part.Color = Color3.fromRGB(255,255,255)
+                end)
+            end
+        end
+        self.OriginalSizes = {}
+        
+        for _, p in ipairs(S.P:GetPlayers()) do
+            if p ~= S.LP and p.Character then
+                local hrp = GHR(p)
                 if hrp and hrp:FindFirstChild("HitboxExpander") then
                     hrp.HitboxExpander:Destroy()
                 end
-                
-                local head = pl.Character:FindFirstChild("Head")
-                local torso = pl.Character:FindFirstChild("Torso") or pl.Character:FindFirstChild("UpperTorso")
-                local leftarm = pl.Character:FindFirstChild("Left Arm") or pl.Character:FindFirstChild("LeftUpperArm")
-                local rightarm = pl.Character:FindFirstChild("Right Arm") or pl.Character:FindFirstChild("RightUpperArm")
-                local leftleg = pl.Character:FindFirstChild("Left Leg") or pl.Character:FindFirstChild("LeftUpperLeg")
-                local rightleg = pl.Character:FindFirstChild("Right Leg") or pl.Character:FindFirstChild("RightUpperLeg")
-                
-                if head then
-                    head.Size = v3(2,1,1)
-                    head.Transparency = 0
-                    head.CanCollide = true
-                    head.Material = Enum.Material.Plastic
-                end
-                if torso then
-                    torso.Size = v3(2,2,1)
-                    torso.Transparency = 0
-                    torso.CanCollide = true
-                    torso.Material = Enum.Material.Plastic
-                end
-                if leftarm then
-                    leftarm.Size = v3(1,2,1)
-                    leftarm.Transparency = 0
-                    leftarm.CanCollide = true
-                    leftarm.Material = Enum.Material.Plastic
-                end
-                if rightarm then
-                    rightarm.Size = v3(1,2,1)
-                    rightarm.Transparency = 0
-                    rightarm.CanCollide = true
-                    rightarm.Material = Enum.Material.Plastic
-                end
-                if leftleg then
-                    leftleg.Size = v3(1,2,1)
-                    leftleg.Transparency = 0
-                    leftleg.CanCollide = true
-                    leftleg.Material = Enum.Material.Plastic
-                end
-                if rightleg then
-                    rightleg.Size = v3(1,2,1)
-                    rightleg.Transparency = 0
-                    rightleg.CanCollide = true
-                    rightleg.Material = Enum.Material.Plastic
-                end
             end
         end
     end
     
-    local ws = {
-        on = false,
-        f = 8,
-        d = 0.3
+    local PC = {
+        Enabled = false,
+        Mode = "Static",
+        Factor = 0.22,
+        Dynamic = true,
+        DistanceFactor = 0.0015,
+        VelocityFactor = 0.5,
+        AccelerationFactor = 0.3,
+        GravityFactor = 0.1,
+        DragFactor = 0.001,
+        Iterations = 5,
+        MaxPredict = 0.4,
+        MinPredict = 0.08,
+        TargetLead = false,
+        TargetLeadMultiplier = 1,
+        HistorySize = 15,
+        History = {}
     }
     
-    function ws:up()
-        if not self.on then return end
-        if not UIS.TouchEnabled then return end
+    function PC:Predict(t)
+        if not self.Enabled then return t.Position end
         
-        local touches = UIS:GetTouchInputs()
-        if #touches == 0 then return end
+        local hist = self.History[t] or {}
+        table.insert(hist, {pos = t.Position, vel = t.AssemblyLinearVelocity, time = GPS()})
+        if #hist > self.HistorySize then table.remove(hist, 1) end
+        self.History[t] = hist
         
-        for _,pl in pairs(P:GetPlayers()) do
-            if pl ~= LP and a(pl) then
-                local root = ghr(pl)
-                if root then
-                    local dist = (LP.Character.HumanoidRootPart.Position - root.Position).Magnitude
-                    if dist < self.f then
-                        local vel = (LP.Character.HumanoidRootPart.Position - root.Position).Unit * -50
-                        root.AssemblyLinearVelocity = vel
+        local pos = t.Position
+        local vel = t.AssemblyLinearVelocity
+        local dist = (S.C.CFrame.Position - pos).Magnitude
+        
+        local factor = self.Factor
+        if self.Dynamic then
+            factor = U.CL(factor + (dist * self.DistanceFactor), self.MinPredict, self.MaxPredict)
+        end
+        
+        if self.Mode == "Velocity" then
+            return pos + vel * factor
+        elseif self.Mode == "Acceleration" and #hist >= 3 then
+            local v1, v2 = hist[#hist-1].vel, hist[#hist].vel
+            local acc = (v2 - v1) / (hist[#hist].time - hist[#hist-1].time)
+            return pos + vel * factor + acc * (factor * factor * 0.5)
+        elseif self.Mode == "Ballistic" then
+            local p = pos
+            local v = vel
+            local dt = factor / self.Iterations
+            for i = 1, self.Iterations do
+                v = v - v * self.DragFactor * dt
+                v = v - U.V3(0, S.G * self.GravityFactor * dt, 0)
+                p = p + v * dt
+            end
+            return p
+        else
+            return pos + vel * factor
+        end
+    end
+    
+    local AA = {
+        Enabled = false,
+        Pitch = 0,
+        Yaw = 90,
+        Roll = 0,
+        Jitter = false,
+        JitterRange = 8,
+        JitterSpeed = 0.1,
+        JitterTimer = 0,
+        Fake = false,
+        FakeAngle = 180,
+        FakeJitter = false,
+        Silent = true,
+        Mode = "Static",
+        Spin = false,
+        SpinSpeed = 5,
+        SpinDirection = "Horizontal",
+        SpinAxis = U.V3(0,1,0),
+        Random = false,
+        RandomInterval = 0.3,
+        RandomTimer = 0,
+        TargetPrediction = false,
+        TargetDirection = false,
+        MouseFollow = false,
+        MouseFollowStrength = 0.3
+    }
+    
+    function AA:Update()
+        if not self.Enabled then return end
+        if not S.LP.Character then return end
+        
+        local root = GHR(S.LP)
+        if not root then return end
+        
+        local pitch = self.Pitch
+        local yaw = self.Yaw
+        local roll = self.Roll
+        
+        if self.Jitter then
+            self.JitterTimer = self.JitterTimer + CACHE.Delta
+            if self.JitterTimer >= self.JitterSpeed then
+                self.JitterTimer = 0
+                local jx = U.RNG(-self.JitterRange, self.JitterRange)
+                local jy = U.RNG(-self.JitterRange, self.JitterRange)
+                local jz = U.RNG(-self.JitterRange, self.JitterRange)
+                pitch = pitch + jx
+                yaw = yaw + jy
+                roll = roll + jz
+            end
+        end
+        
+        if self.Spin then
+            local spinYaw = (GPS() * self.SpinSpeed) % 360
+            if self.SpinDirection == "Horizontal" then
+                yaw = spinYaw
+            elseif self.SpinDirection == "Vertical" then
+                pitch = spinYaw
+            elseif self.SpinDirection == "Roll" then
+                roll = spinYaw
+            elseif self.SpinDirection == "All" then
+                pitch = spinYaw
+                yaw = spinYaw
+                roll = spinYaw
+            end
+        end
+        
+        if self.Random then
+            self.RandomTimer = self.RandomTimer + CACHE.Delta
+            if self.RandomTimer >= self.RandomInterval then
+                self.RandomTimer = 0
+                pitch = U.RNG(-180, 180)
+                yaw = U.RNG(-180, 180)
+                roll = U.RNG(-180, 180)
+            end
+        end
+        
+        if self.MouseFollow and S.UIS.TouchEnabled then
+            local touches = S.UIS:GetTouchInputs()
+            if #touches > 0 then
+                local touch = touches[1]
+                local delta = touch.Delta or U.V2()
+                yaw = yaw + delta.X * self.MouseFollowStrength
+                pitch = pitch - delta.Y * self.MouseFollowStrength
+            end
+        end
+        
+        local angles = U.V3(U.R(pitch), U.R(yaw), U.R(roll))
+        
+        if self.Silent then
+            root.CFrame = root.CFrame * CFrame.Angles(angles.X, angles.Y, angles.Z)
+        end
+    end
+    
+    local WSYS = {
+        Enabled = false,
+        Distance = 10,
+        Force = 60,
+        Push = true,
+        Pull = false,
+        Direction = "Away",
+        ExcludeTeam = true,
+        Velocity = true,
+        Position = false,
+        Tween = false,
+        TweenSpeed = 0.2,
+        Repel = false,
+        RepelDistance = 8,
+        RepelForce = 40,
+        Attract = false,
+        AttractDistance = 12,
+        AttractForce = 30,
+        Vortex = false,
+        VortexRadius = 15,
+        VortexForce = 25,
+        VortexHeight = 5
+    }
+    
+    function WSYS:Update()
+        if not self.Enabled then return end
+        if not S.LP.Character then return end
+        
+        local root = GHR(S.LP)
+        if not root then return end
+        
+        for _, p in ipairs(S.P:GetPlayers()) do
+            if p ~= S.LP and V(p) then
+                if self.ExcludeTeam and p.Team == S.LP.Team then continue end
+                
+                local pr = GHR(p)
+                if pr then
+                    local dist = (root.Position - pr.Position).Magnitude
+                    
+                    if self.Push and dist < self.Distance then
+                        local dir = (pr.Position - root.Position).Unit
+                        if self.Direction == "Away" then
+                            dir = -dir
+                        end
+                        local force = dir * (self.Force * (1 - dist/self.Distance))
+                        pr.AssemblyLinearVelocity = pr.AssemblyLinearVelocity + force
+                    end
+                    
+                    if self.Repel and dist < self.RepelDistance then
+                        local dir = (pr.Position - root.Position).Unit * -1
+                        local force = dir * (self.RepelForce * (1 - dist/self.RepelDistance))
+                        pr.AssemblyLinearVelocity = pr.AssemblyLinearVelocity + force
+                    end
+                    
+                    if self.Attract and dist < self.AttractDistance then
+                        local dir = (root.Position - pr.Position).Unit
+                        local force = dir * (self.AttractForce * (1 - dist/self.AttractDistance))
+                        pr.AssemblyLinearVelocity = pr.AssemblyLinearVelocity + force
+                    end
+                    
+                    if self.Vortex and dist < self.VortexRadius then
+                        local angle = GPS() * 5
+                        local rad = self.VortexRadius * (1 - dist/self.VortexRadius)
+                        local x = U.COS(angle) * rad
+                        local z = U.SIN(angle) * rad
+                        local dir = U.V3(x, self.VortexHeight, z)
+                        pr.AssemblyLinearVelocity = pr.AssemblyLinearVelocity + dir * self.VortexForce * 0.1
                     end
                 end
             end
         end
     end
     
-    local bt = {
-        on = false,
-        e = false,
-        a = false,
-        w = false
+    local AW = {
+        Enabled = false,
+        MinDamage = 25,
+        MaxDistance = 250,
+        Penetration = 0.65,
+        PenetrationLoss = 0.2,
+        DistanceLoss = 0.0015,
+        MaterialPenetration = {
+            [Enum.Material.Plastic] = 0.8,
+            [Enum.Material.Wood] = 0.7,
+            [Enum.Material.Metal] = 0.4,
+            [Enum.Material.Glass] = 0.9,
+            [Enum.Material.Concrete] = 0.2,
+            [Enum.Material.Brick] = 0.15,
+            [Enum.Material.Slate] = 0.1,
+            [Enum.Material.Granite] = 0.05,
+            [Enum.Material.Marble] = 0.1,
+            [Enum.Material.Sandstone] = 0.25,
+            [Enum.Material.Cobblestone] = 0.2
+        }
     }
     
-    mt.__namecall = newcclosure(function(s, ...)
+    function AW:CanPenetrate(pos, dir, dist)
+        if not self.Enabled then return true end
+        
+        local params = RaycastParams.new()
+        params.FilterDescendantsInstances = {S.LP.Character}
+        params.FilterType = Enum.RaycastFilterType.Blacklist
+        
+        local ray = S.WS:Raycast(pos, dir * dist, params)
+        if not ray then return true end
+        
+        local penetration = self.Penetration
+        local material = ray.Material
+        
+        if self.MaterialPenetration[material] then
+            penetration = penetration * self.MaterialPenetration[material]
+        end
+        
+        local distance = (ray.Position - pos).Magnitude
+        penetration = penetration * (1 - distance * self.DistanceLoss)
+        penetration = penetration * (1 - ray.Instance.Transparency)
+        
+        return penetration >= 0.2
+    end
+    
+    local VIZ = {
+        Enabled = false,
+        FOVCircle = false,
+        FOVColor = Color3.fromRGB(255,255,255),
+        FOVRadius = 180,
+        FOVThickness = 1,
+        FOVFilled = false,
+        FOVTransparency = 0.5,
+        TargetLine = false,
+        TargetLineColor = Color3.fromRGB(255,0,0),
+        TargetLineThickness = 1,
+        Hitmarker = false,
+        HitmarkerColor = Color3.fromRGB(255,255,255),
+        HitmarkerSize = 10,
+        HitmarkerDuration = 0.5,
+        HitmarkerSound = false,
+        Crosshair = false,
+        CrosshairColor = Color3.fromRGB(255,255,255),
+        CrosshairSize = 10,
+        CrosshairGap = 5,
+        CrosshairThickness = 1
+    }
+    
+    if VIZ.Enabled and Drawing then
+        local fovCircle = Drawing.new("Circle")
+        fovCircle.Visible = false
+        fovCircle.NumSides = 64
+        fovCircle.Filled = false
+        fovCircle.Thickness = 1
+        fovCircle.Color = Color3.fromRGB(255,255,255)
+        fovCircle.Radius = 180
+        
+        local hitmarkers = {}
+        
+        S.RS.RenderStepped:Connect(function()
+            if VIZ.FOVCircle then
+                fovCircle.Position = U.V2(S.C.ViewportSize.X/2, S.C.ViewportSize.Y/2)
+                fovCircle.Radius = SIL.FOV or AIM.FOV or 180
+                fovCircle.Color = VIZ.FOVColor
+                fovCircle.Thickness = VIZ.FOVThickness
+                fovCircle.Filled = VIZ.FOVFilled
+                fovCircle.Transparency = VIZ.FOVTransparency
+                fovCircle.Visible = true
+            else
+                fovCircle.Visible = false
+            end
+            
+            for i, hm in ipairs(hitmarkers) do
+                if GPS() - hm.time > VIZ.HitmarkerDuration then
+                    if hm.line1 then hm.line1:Remove() end
+                    if hm.line2 then hm.line2:Remove() end
+                    table.remove(hitmarkers, i)
+                else
+                    local alpha = 1 - (GPS() - hm.time) / VIZ.HitmarkerDuration
+                    if hm.line1 then
+                        hm.line1.Transparency = alpha
+                        hm.line2.Transparency = alpha
+                    end
+                end
+            end
+        end)
+    end
+    
+    M.__namecall = newcclosure(function(s, ...)
         local a, m = {...}, getnamecallmethod()
         
-        if silent.on and (m == "FindPartOnRay" or m == "Raycast") then
-            local tp = silent:gt()
-            if tp and math.random(1,100) <= silent.hc then
-                local dir = (tp - C.CFrame.Position).Unit * 1000
+        if SIL.Enabled and (m == "FindPartOnRay" or m == "Raycast") then
+            local targetData = SIL:GetTarget()
+            if targetData and U.RNG(1,100) <= targetData.HitChance then
+                local dir = (targetData.Position - S.C.CFrame.Position).Unit * 1000
+                
+                if AW.Enabled then
+                    if not AW:CanPenetrate(S.C.CFrame.Position, dir, SIL.AutoWallDistance or 200) then
+                        return old(s, ...)
+                    end
+                end
+                
                 if type(a[1]) == "userdata" and typeof(a[1]) == "Ray" then
-                    local ray = Ray.new(C.CFrame.Position, dir)
-                    return old(s, unpack({ray, table.unpack(a, 2)}))
+                    local ray = Ray.new(S.C.CFrame.Position, dir)
+                    local hit, pos = old(s, unpack({ray, table.unpack(a, 2)}))
+                    
+                    if VIZ.Enabled and VIZ.Hitmarker and hit and hit.Parent and V(hit) then
+                        local spos, vis = W2S(pos)
+                        if vis and Drawing then
+                            local hm = {
+                                time = GPS(),
+                                line1 = Drawing.new("Line"),
+                                line2 = Drawing.new("Line")
+                            }
+                            hm.line1.From = spos - U.V2(VIZ.HitmarkerSize, VIZ.HitmarkerSize)
+                            hm.line1.To = spos + U.V2(VIZ.HitmarkerSize, VIZ.HitmarkerSize)
+                            hm.line2.From = spos - U.V2(-VIZ.HitmarkerSize, VIZ.HitmarkerSize)
+                            hm.line2.To = spos + U.V2(-VIZ.HitmarkerSize, VIZ.HitmarkerSize)
+                            hm.line1.Color = VIZ.HitmarkerColor
+                            hm.line2.Color = VIZ.HitmarkerColor
+                            hm.line1.Thickness = 1
+                            hm.line2.Thickness = 1
+                            hm.line1.Visible = true
+                            hm.line2.Visible = true
+                            table.insert(hitmarkers, hm)
+                        end
+                    end
+                    
+                    return hit, pos
                 elseif type(a[1]) == "userdata" and typeof(a[1]) == "Vector3" then
-                    return old(s, unpack({C.CFrame.Position, dir, table.unpack(a, 3)}))
+                    return old(s, unpack({S.C.CFrame.Position, dir, table.unpack(a, 3)}))
                 end
             end
         end
@@ -435,92 +1314,195 @@ do
         return old(s, ...)
     end)
     
-    setreadonly(mt, true)
+    setreadonly(M, true)
     
-    RS.RenderStepped:Connect(function()
+    S.RS.RenderStepped:Connect(function(dt)
+        CACHE.Delta = dt
+        CACHE.Frames = CACHE.Frames + 1
+        CACHE.Tick = GPS()
+        
         pcall(function()
-            aim:up()
-            trig:up()
-            hb:apply()
-            ws:up()
+            AIM:Update()
+            TRG:Update()
+            HB:Apply()
+            WSYS:Update()
+            AA:Update()
         end)
     end)
     
-    P.PlayerAdded:Connect(function(pl)
-        pl.CharacterAdded:Connect(function()
-            if hb.on then
-                task.wait(0.5)
-                hb:apply()
+    S.P.PlayerAdded:Connect(function(p)
+        p.CharacterAdded:Connect(function()
+            if HB.Enabled and HB.Persistent then
+                task.wait(HB.ReapplyDelay)
+                HB:Apply()
             end
         end)
     end)
     
-    function L.Aimbot(c)
-        if c then for k,v in pairs(c) do aim[k] = v end end
-        aim.on = true
-        return aim
+    S.P.PlayerRemoving:Connect(function(p)
+        CACHE.Roots[p] = nil
+        CACHE.Velocities[p] = nil
+        FPModule.History[p] = nil
+        PC.History[p] = nil
+    end)
+    
+    local API = {}
+    
+    function API.Aimbot(c)
+        if c then for k,v in pairs(c) do AIM[k] = v end end
+        AIM.Enabled = true
+        return AIM
     end
     
-    function L.Trigger(c)
-        if c then for k,v in pairs(c) do trig[k] = v end end
-        trig.on = true
-        return trig
+    function API.Triggerbot(c)
+        if c then for k,v in pairs(c) do TRG[k] = v end end
+        TRG.Enabled = true
+        return TRG
     end
     
-    function L.Silent(c)
-        if c then for k,v in pairs(c) do silent[k] = v end end
-        silent.on = true
-        return silent
+    function API.SilentAim(c)
+        if c then for k,v in pairs(c) do SIL[k] = v end end
+        SIL.Enabled = true
+        return SIL
     end
     
-    function L.Hitbox(c)
-        if c then for k,v in pairs(c) do hb[k] = v end end
-        hb.on = true
-        return hb
+    function API.Hitbox(c)
+        if c then for k,v in pairs(c) do HB[k] = v end end
+        HB.Enabled = true
+        return HB
     end
     
-    function L.Whitelist(c)
-        return {}
+    function API.Prediction(c)
+        if c then for k,v in pairs(c) do PC[k] = v end end
+        PC.Enabled = true
+        return PC
     end
     
-    function L.ResetHitbox()
-        hb:reset()
+    function API.AntiAim(c)
+        if c then for k,v in pairs(c) do AA[k] = v end end
+        AA.Enabled = true
+        return AA
     end
     
-    function L.Wallbang(c)
-        return {}
+    function API.WhitelistSystem(c)
+        if c then for k,v in pairs(c) do FC[k] = v end end
+        FC.Enabled = true
+        return FC
     end
     
-    function L.DisableAll()
-        aim.on = false
-        trig.on = false
-        silent.on = false
-        hb.on = false
-        ws.on = false
-        hb:reset()
+    function API.AutoWall(c)
+        if c then for k,v in pairs(c) do AW[k] = v end end
+        AW.Enabled = true
+        return AW
     end
     
-    function L.IsMobile()
-        return UIS.TouchEnabled and not UIS.MouseEnabled
+    function API.Physics(c)
+        if c then for k,v in pairs(c) do WSYS[k] = v end end
+        WSYS.Enabled = true
+        return WSYS
     end
     
-    function L.Arsenal()
+    function API.Visuals(c)
+        if c then for k,v in pairs(c) do VIZ[k] = v end end
+        VIZ.Enabled = true
+        return VIZ
+    end
+    
+    function API.Ballistics(c)
+        if c then for k,v in pairs(c) do PB[k] = v end end
+        PB.Enabled = true
+        return PB
+    end
+    
+    function API.FramePrediction(c)
+        if c then for k,v in pairs(c) do FPModule[k] = v end end
+        FPModule.Enabled = true
+        return FPModule
+    end
+    
+    function API.ResetHitbox()
+        HB:Restore()
+    end
+    
+    function API.DisableAll()
+        AIM.Enabled = false
+        TRG.Enabled = false
+        SIL.Enabled = false
+        HB.Enabled = false
+        PC.Enabled = false
+        AA.Enabled = false
+        WSYS.Enabled = false
+        PB.Enabled = false
+        FPModule.Enabled = false
+        AW.Enabled = false
+        FC.Enabled = false
+        HB:Restore()
+    end
+    
+    function API.GetState()
         return {
-            Aimbot = aim,
-            Trigger = trig,
-            Silent = silent,
-            Hitbox = hb
+            Aimbot = AIM.Enabled,
+            Triggerbot = TRG.Enabled,
+            SilentAim = SIL.Enabled,
+            Hitbox = HB.Enabled,
+            Prediction = PC.Enabled,
+            AntiAim = AA.Enabled,
+            Physics = WSYS.Enabled,
+            AutoWall = AW.Enabled,
+            FPS = GFD(),
+            Ping = GPI(),
+            Time = GPS(),
+            Platform = {
+                Mobile = S.UIS.TouchEnabled and not S.UIS.MouseEnabled,
+                Console = S.UIS.GamepadEnabled,
+                VR = S.UIS.VREnabled,
+                Touch = S.UIS.TouchEnabled
+            }
         }
     end
     
-    wait(0.1)
-    if UIS.TouchEnabled then
-        aim.s = 0.22
-        aim.p = 0.28
-        trig.d = 0.018
-        trig.b = 4
-        hb.s = 1.5
+    function API.GetTargets()
+        return {
+            Crosshair = function(f,t) return GCT(f or 180, t, FP) end,
+            Mouse = function(f,t) return GCM(f or 200, t, FP) end,
+            Bone = function(b,f,t) return GCTB(f or 180, t, b, FP) end,
+            Validate = V,
+            Filter = FP
+        }
     end
-end
+    
+    function API.W2S(p)
+        return W2S(p)
+    end
+    
+    function API.W2R(p)
+        return W2R(p)
+    end
+    
+    function API.GetServices()
+        return S
+    end
+    
+    function API.GetCache()
+        return CACHE
+    end
+    
+    function API.GetUtilities()
+        return U
+    end
+    
+    if S.UIS.TouchEnabled then
+        AIM.Smooth = 0.28
+        AIM.TouchSensitivity = 0.72
+        AIM.Prediction = 0.26
+        TRG.Delay = 0.012
+        TRG.Burst = 4
+        HB.Scale = 1.7
+        SIL.Chance = 90
+        SIL.Prediction = 0.22
+    end
+    
+    return API
+end)()
 
 return L
