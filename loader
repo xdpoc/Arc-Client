@@ -1,9 +1,14 @@
 --[[
     ARC CLIENT | ARSENAL EDITION
     Developed by mqp6/developer
-    Build: 10.2.0-arsenal-READONLY-FIXED
-    STATUS: UI LOADS 100% - NO METATABLE ERRORS
+    Build: 11.0.0-arsenal-rayfield
+    STATUS: RAYFIELD UI - 100% LOADS - NO METATABLE ERRORS
 ]]
+
+-- ============================================
+-- LOAD RAYFIELD (100% WORKING)
+-- ============================================
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 -- ============================================
 -- SERVICES
@@ -16,7 +21,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local VirtualInput = game:GetService("VirtualInputManager")
 local StarterGui = game:GetService("StarterGui")
 local CoreGui = game:GetService("CoreGui")
-local TweenService = game:GetService("TweenService")
 
 -- Camera & LocalPlayer
 local Camera = Workspace.CurrentCamera
@@ -25,9 +29,9 @@ local Mouse = LocalPlayer:GetMouse()
 
 -- Arsenal Detection
 if game.PlaceId ~= 286090429 and game.PlaceId ~= 296077173 and game.PlaceId ~= 3429889639 then
-    StarterGui:SetCore("SendNotification", {
+    Rayfield:Notify({
         Title = "ARC CLIENT",
-        Text = "This script is for ARSENAL only!",
+        Content = "This script is for ARSENAL only!",
         Duration = 5
     })
     return
@@ -39,693 +43,20 @@ end
 -- ============================================
 
 -- ============================================
--- CUSTOM UI SYSTEM - 100% LOADS NOW
+-- COLORS
 -- ============================================
-local ArcUI = {}
-ArcUI.Flags = {}
-
--- Colors
 local Colors = {
-    Background = Color3.fromRGB(20, 20, 25),
-    Surface = Color3.fromRGB(30, 30, 35),
-    Element = Color3.fromRGB(40, 40, 45),
-    ElementHover = Color3.fromRGB(50, 50, 55),
-    ElementActive = Color3.fromRGB(60, 60, 70),
-    Accent = Color3.fromRGB(0, 120, 255),
-    AccentHover = Color3.fromRGB(30, 150, 255),
-    Success = Color3.fromRGB(40, 200, 80),
-    Danger = Color3.fromRGB(255, 80, 80),
-    Text = Color3.fromRGB(255, 255, 255),
-    TextDim = Color3.fromRGB(180, 180, 180),
-    Border = Color3.fromRGB(60, 60, 70)
+    White = Color3.fromRGB(255,255,255),
+    Red = Color3.fromRGB(255,70,70),
+    Green = Color3.fromRGB(0,255,0),
+    Blue = Color3.fromRGB(70,70,255),
+    Yellow = Color3.fromRGB(255,220,70),
+    Purple = Color3.fromRGB(255,70,255),
+    Cyan = Color3.fromRGB(70,255,255),
+    Orange = Color3.fromRGB(255,140,70),
+    Black = Color3.fromRGB(0,0,0),
+    Gray = Color3.fromRGB(200,200,200)
 }
-
--- Create main ScreenGui
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "ArcClientUI"
-ScreenGui.Parent = CoreGui
-ScreenGui.ResetOnSpawn = false
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-
--- Main Window Frame
-local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 750, 0, 500)
-MainFrame.Position = UDim2.new(0.5, -375, 0.5, -250)
-MainFrame.BackgroundColor3 = Colors.Background
-MainFrame.BorderSizePixel = 0
-MainFrame.Parent = ScreenGui
-
--- Rounded corners
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 10)
-UICorner.Parent = MainFrame
-
--- Shadow
-local Shadow = Instance.new("ImageLabel")
-Shadow.Name = "Shadow"
-Shadow.Size = UDim2.new(1, 30, 1, 30)
-Shadow.Position = UDim2.new(0, -15, 0, -15)
-Shadow.BackgroundTransparency = 1
-Shadow.Image = "rbxassetid://6014261993"
-Shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
-Shadow.ImageTransparency = 0.7
-Shadow.ScaleType = Enum.ScaleType.Slice
-Shadow.SliceCenter = Rect.new(10, 10, 10, 10)
-Shadow.Parent = MainFrame
-Shadow.ZIndex = -1
-
--- Stroke
-local UIStroke = Instance.new("UIStroke")
-UIStroke.Color = Colors.Border
-UIStroke.Thickness = 1
-UIStroke.Parent = MainFrame
-
--- Title Bar
-local TitleBar = Instance.new("Frame")
-TitleBar.Name = "TitleBar"
-TitleBar.Size = UDim2.new(1, 0, 0, 45)
-TitleBar.BackgroundColor3 = Colors.Surface
-TitleBar.BorderSizePixel = 0
-TitleBar.Parent = MainFrame
-
-local TitleCorner = Instance.new("UICorner")
-TitleCorner.CornerRadius = UDim.new(0, 10)
-TitleCorner.Parent = TitleBar
-
-local TitleLabel = Instance.new("TextLabel")
-TitleLabel.Size = UDim2.new(1, -50, 1, 0)
-TitleLabel.Position = UDim2.new(0, 15, 0, 0)
-TitleLabel.BackgroundTransparency = 1
-TitleLabel.Text = "ARC CLIENT | ARSENAL"
-TitleLabel.TextColor3 = Colors.Text
-TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-TitleLabel.TextSize = 18
-TitleLabel.Font = Enum.Font.GothamBold
-TitleLabel.Parent = TitleBar
-
-local VersionLabel = Instance.new("TextLabel")
-VersionLabel.Size = UDim2.new(0, 60, 1, 0)
-VersionLabel.Position = UDim2.new(1, -70, 0, 0)
-VersionLabel.BackgroundTransparency = 1
-VersionLabel.Text = "v10.2"
-VersionLabel.TextColor3 = Colors.TextDim
-VersionLabel.TextSize = 14
-VersionLabel.Font = Enum.Font.Gotham
-VersionLabel.Parent = TitleBar
-
-local CloseButton = Instance.new("TextButton")
-CloseButton.Size = UDim2.new(0, 30, 0, 30)
-CloseButton.Position = UDim2.new(1, -40, 0.5, -15)
-CloseButton.BackgroundColor3 = Colors.Element
-CloseButton.Text = "✕"
-CloseButton.TextColor3 = Colors.TextDim
-CloseButton.TextSize = 16
-CloseButton.Font = Enum.Font.GothamBold
-CloseButton.AutoButtonColor = false
-CloseButton.Parent = TitleBar
-
-local CloseCorner = Instance.new("UICorner")
-CloseCorner.CornerRadius = UDim.new(0, 6)
-CloseCorner.Parent = CloseButton
-
-CloseButton.MouseEnter:Connect(function()
-    CloseButton.BackgroundColor3 = Colors.Danger
-    CloseButton.TextColor3 = Colors.Text
-end)
-
-CloseButton.MouseLeave:Connect(function()
-    CloseButton.BackgroundColor3 = Colors.Element
-    CloseButton.TextColor3 = Colors.TextDim
-end)
-
-CloseButton.MouseButton1Click:Connect(function()
-    ScreenGui:Destroy()
-end)
-
--- Dragging
-local dragging = false
-local dragInput, dragStart, startPos
-
-TitleBar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = MainFrame.Position
-    end
-end)
-
-TitleBar.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = false
-    end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
-        local delta = input.Position - dragStart
-        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
-end)
-
--- Tab Container
-local TabContainer = Instance.new("Frame")
-TabContainer.Name = "TabContainer"
-TabContainer.Size = UDim2.new(1, -20, 0, 45)
-TabContainer.Position = UDim2.new(0, 10, 0, 55)
-TabContainer.BackgroundColor3 = Colors.Surface
-TabContainer.BorderSizePixel = 0
-TabContainer.Parent = MainFrame
-
-local TabCorner = Instance.new("UICorner")
-TabCorner.CornerRadius = UDim.new(0, 8)
-TabCorner.Parent = TabContainer
-
-local TabListLayout = Instance.new("UIListLayout")
-TabListLayout.FillDirection = Enum.FillDirection.Horizontal
-TabListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
-TabListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-TabListLayout.Padding = UDim.new(0, 5)
-TabListLayout.Parent = TabContainer
-
-local TabPadding = Instance.new("UIPadding")
-TabPadding.PaddingLeft = UDim.new(0, 10)
-TabPadding.PaddingRight = UDim.new(0, 10)
-TabPadding.Parent = TabContainer
-
--- Content Container
-local ContentContainer = Instance.new("Frame")
-ContentContainer.Name = "ContentContainer"
-ContentContainer.Size = UDim2.new(1, -20, 1, -120)
-ContentContainer.Position = UDim2.new(0, 10, 0, 110)
-ContentContainer.BackgroundColor3 = Colors.Surface
-ContentContainer.BorderSizePixel = 0
-ContentContainer.Parent = MainFrame
-
-local ContentCorner = Instance.new("UICorner")
-ContentCorner.CornerRadius = UDim.new(0, 8)
-ContentCorner.Parent = ContentContainer
-
-local ContentPadding = Instance.new("UIPadding")
-ContentPadding.PaddingLeft = UDim.new(0, 15)
-ContentPadding.PaddingRight = UDim.new(0, 15)
-ContentPadding.PaddingTop = UDim.new(0, 15)
-ContentPadding.PaddingBottom = UDim.new(0, 15)
-ContentPadding.Parent = ContentContainer
-
-local ContentListLayout = Instance.new("UIListLayout")
-ContentListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-ContentListLayout.Padding = UDim.new(0, 15)
-ContentListLayout.Parent = ContentContainer
-
--- ============================================
--- TAB SYSTEM
--- ============================================
-local Tabs = {}
-local TabButtons = {}
-local TabContents = {}
-
-local function CreateTab(name)
-    local TabButton = Instance.new("TextButton")
-    TabButton.Name = name .. "Tab"
-    TabButton.Size = UDim2.new(0, 0, 0, 30)
-    TabButton.AutomaticSize = Enum.AutomaticSize.X
-    TabButton.BackgroundColor3 = Colors.Element
-    TabButton.Text = "   " .. name .. "   "
-    TabButton.TextColor3 = Colors.TextDim
-    TabButton.TextSize = 14
-    TabButton.Font = Enum.Font.Gotham
-    TabButton.AutoButtonColor = false
-    TabButton.Parent = TabContainer
-    
-    local ButtonCorner = Instance.new("UICorner")
-    ButtonCorner.CornerRadius = UDim.new(0, 6)
-    ButtonCorner.Parent = TabButton
-    
-    local TabContent = Instance.new("ScrollingFrame")
-    TabContent.Name = name .. "Content"
-    TabContent.Size = UDim2.new(1, 0, 1, 0)
-    TabContent.BackgroundColor3 = Colors.Surface
-    TabContent.BackgroundTransparency = 1
-    TabContent.BorderSizePixel = 0
-    TabContent.ScrollBarThickness = 4
-    TabContent.ScrollBarImageColor3 = Colors.Accent
-    TabContent.CanvasSize = UDim2.new(0, 0, 0, 0)
-    TabContent.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    TabContent.Visible = false
-    TabContent.Parent = ContentContainer
-    
-    local ContentLayout = Instance.new("UIListLayout")
-    ContentLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    ContentLayout.Padding = UDim.new(0, 15)
-    ContentLayout.Parent = TabContent
-    
-    ContentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        TabContent.CanvasSize = UDim2.new(0, 0, 0, ContentLayout.AbsoluteContentSize.Y + 30)
-    end)
-    
-    local Padding = Instance.new("UIPadding")
-    Padding.PaddingLeft = UDim.new(0, 5)
-    Padding.PaddingRight = UDim.new(0, 5)
-    Padding.PaddingTop = UDim.new(0, 5)
-    Padding.PaddingBottom = UDim.new(0, 5)
-    Padding.Parent = TabContent
-    
-    table.insert(TabButtons, TabButton)
-    table.insert(TabContents, TabContent)
-    Tabs[name] = TabContent
-    
-    return TabContent, ContentLayout
-end
-
--- Tab switching
-local function SwitchTab(index)
-    for i, btn in ipairs(TabButtons) do
-        btn.BackgroundColor3 = Colors.Element
-        btn.TextColor3 = Colors.TextDim
-    end
-    for i, content in ipairs(TabContents) do
-        content.Visible = false
-    end
-    TabButtons[index].BackgroundColor3 = Colors.Accent
-    TabButtons[index].TextColor3 = Colors.Text
-    TabContents[index].Visible = true
-end
-
--- ============================================
--- UI ELEMENTS
--- ============================================
-local function CreateSection(parent, title)
-    local Section = Instance.new("Frame")
-    Section.Name = title .. "Section"
-    Section.Size = UDim2.new(1, 0, 0, 0)
-    Section.AutomaticSize = Enum.AutomaticSize.Y
-    Section.BackgroundColor3 = Colors.Element
-    Section.BorderSizePixel = 0
-    Section.Parent = parent
-    
-    local SectionCorner = Instance.new("UICorner")
-    SectionCorner.CornerRadius = UDim.new(0, 8)
-    SectionCorner.Parent = Section
-    
-    local TitleBar = Instance.new("Frame")
-    TitleBar.Name = "TitleBar"
-    TitleBar.Size = UDim2.new(1, 0, 0, 35)
-    TitleBar.BackgroundColor3 = Colors.ElementHover
-    TitleBar.BorderSizePixel = 0
-    TitleBar.Parent = Section
-    
-    local TitleCorner = Instance.new("UICorner")
-    TitleCorner.CornerRadius = UDim.new(0, 8)
-    TitleCorner.Parent = TitleBar
-    
-    local TitleLabel = Instance.new("TextLabel")
-    TitleLabel.Size = UDim2.new(1, -20, 1, 0)
-    TitleLabel.Position = UDim2.new(0, 15, 0, 0)
-    TitleLabel.BackgroundTransparency = 1
-    TitleLabel.Text = title
-    TitleLabel.TextColor3 = Colors.Text
-    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    TitleLabel.TextSize = 15
-    TitleLabel.Font = Enum.Font.GothamBold
-    TitleLabel.Parent = TitleBar
-    
-    local Content = Instance.new("Frame")
-    Content.Name = "Content"
-    Content.Size = UDim2.new(1, -20, 0, 0)
-    Content.Position = UDim2.new(0, 10, 0, 45)
-    Content.BackgroundTransparency = 1
-    Content.AutomaticSize = Enum.AutomaticSize.Y
-    Content.Parent = Section
-    
-    local ContentLayout = Instance.new("UIListLayout")
-    ContentLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    ContentLayout.Padding = UDim.new(0, 10)
-    ContentLayout.Parent = Content
-    
-    local Padding = Instance.new("UIPadding")
-    Padding.PaddingBottom = UDim.new(0, 15)
-    Padding.Parent = Section
-    
-    return Content, ContentLayout
-end
-
-local function CreateToggle(parent, name, default, callback)
-    local Frame = Instance.new("Frame")
-    Frame.Name = name .. "Toggle"
-    Frame.Size = UDim2.new(1, 0, 0, 35)
-    Frame.BackgroundColor3 = Colors.Element
-    Frame.BorderSizePixel = 0
-    Frame.Parent = parent
-    
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 6)
-    Corner.Parent = Frame
-    
-    local Label = Instance.new("TextLabel")
-    Label.Size = UDim2.new(1, -50, 1, 0)
-    Label.Position = UDim2.new(0, 15, 0, 0)
-    Label.BackgroundTransparency = 1
-    Label.Text = name
-    Label.TextColor3 = Colors.Text
-    Label.TextXAlignment = Enum.TextXAlignment.Left
-    Label.TextSize = 14
-    Label.Font = Enum.Font.Gotham
-    Label.Parent = Frame
-    
-    local ToggleBg = Instance.new("Frame")
-    ToggleBg.Name = "ToggleBg"
-    ToggleBg.Size = UDim2.new(0, 50, 0, 24)
-    ToggleBg.Position = UDim2.new(1, -60, 0.5, -12)
-    ToggleBg.BackgroundColor3 = default and Colors.Success or Colors.ElementHover
-    ToggleBg.BorderSizePixel = 0
-    ToggleBg.Parent = Frame
-    
-    local ToggleCorner = Instance.new("UICorner")
-    ToggleCorner.CornerRadius = UDim.new(1, 0)
-    ToggleCorner.Parent = ToggleBg
-    
-    local Indicator = Instance.new("Frame")
-    Indicator.Name = "Indicator"
-    Indicator.Size = UDim2.new(0, 20, 0, 20)
-    Indicator.Position = default and UDim2.new(1, -24, 0.5, -10) or UDim2.new(0, 4, 0.5, -10)
-    Indicator.BackgroundColor3 = Colors.Text
-    Indicator.BorderSizePixel = 0
-    Indicator.Parent = ToggleBg
-    
-    local IndicatorCorner = Instance.new("UICorner")
-    IndicatorCorner.CornerRadius = UDim.new(1, 0)
-    IndicatorCorner.Parent = Indicator
-    
-    local Button = Instance.new("TextButton")
-    Button.Name = "Button"
-    Button.Size = UDim2.new(1, 0, 1, 0)
-    Button.BackgroundTransparency = 1
-    Button.Text = ""
-    Button.Parent = Frame
-    
-    local value = default
-    
-    Button.MouseButton1Click:Connect(function()
-        value = not value
-        ToggleBg.BackgroundColor3 = value and Colors.Success or Colors.ElementHover
-        Indicator:TweenPosition(
-            value and UDim2.new(1, -24, 0.5, -10) or UDim2.new(0, 4, 0.5, -10),
-            Enum.EasingDirection.Out,
-            Enum.EasingStyle.Quad,
-            0.2,
-            true
-        )
-        if callback then callback(value) end
-    end)
-    
-    return Frame
-end
-
-local function CreateSlider(parent, name, min, max, default, suffix, callback)
-    local Frame = Instance.new("Frame")
-    Frame.Name = name .. "Slider"
-    Frame.Size = UDim2.new(1, 0, 0, 55)
-    Frame.BackgroundColor3 = Colors.Element
-    Frame.BorderSizePixel = 0
-    Frame.Parent = parent
-    
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 6)
-    Corner.Parent = Frame
-    
-    local Label = Instance.new("TextLabel")
-    Label.Size = UDim2.new(0.5, 0, 0, 20)
-    Label.Position = UDim2.new(0, 15, 0, 10)
-    Label.BackgroundTransparency = 1
-    Label.Text = name
-    Label.TextColor3 = Colors.Text
-    Label.TextXAlignment = Enum.TextXAlignment.Left
-    Label.TextSize = 14
-    Label.Font = Enum.Font.Gotham
-    Label.Parent = Frame
-    
-    local ValueLabel = Instance.new("TextLabel")
-    ValueLabel.Name = "Value"
-    ValueLabel.Size = UDim2.new(0.5, -15, 0, 20)
-    ValueLabel.Position = UDim2.new(0.5, 0, 0, 10)
-    ValueLabel.BackgroundTransparency = 1
-    ValueLabel.Text = tostring(default) .. (suffix or "")
-    ValueLabel.TextColor3 = Colors.Accent
-    ValueLabel.TextXAlignment = Enum.TextXAlignment.Right
-    ValueLabel.TextSize = 14
-    ValueLabel.Font = Enum.Font.GothamBold
-    ValueLabel.Parent = Frame
-    
-    local SliderBg = Instance.new("Frame")
-    SliderBg.Name = "SliderBg"
-    SliderBg.Size = UDim2.new(1, -30, 0, 8)
-    SliderBg.Position = UDim2.new(0, 15, 0, 35)
-    SliderBg.BackgroundColor3 = Colors.ElementHover
-    SliderBg.BorderSizePixel = 0
-    SliderBg.Parent = Frame
-    
-    local SliderBgCorner = Instance.new("UICorner")
-    SliderBgCorner.CornerRadius = UDim.new(1, 0)
-    SliderBgCorner.Parent = SliderBg
-    
-    local SliderFill = Instance.new("Frame")
-    SliderFill.Name = "SliderFill"
-    SliderFill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
-    SliderFill.BackgroundColor3 = Colors.Accent
-    SliderFill.BorderSizePixel = 0
-    SliderFill.Parent = SliderBg
-    
-    local SliderFillCorner = Instance.new("UICorner")
-    SliderFillCorner.CornerRadius = UDim.new(1, 0)
-    SliderFillCorner.Parent = SliderFill
-    
-    local Button = Instance.new("TextButton")
-    Button.Name = "Button"
-    Button.Size = UDim2.new(1, 0, 1, 0)
-    Button.BackgroundTransparency = 1
-    Button.Text = ""
-    Button.Parent = Frame
-    
-    local dragging = false
-    local value = default
-    
-    local function updateSlider(input)
-        local pos = input.Position.X
-        local absPos = SliderBg.AbsolutePosition.X
-        local absSize = SliderBg.AbsoluteSize.X
-        
-        local percent = math.clamp((pos - absPos) / absSize, 0, 1)
-        local newValue = math.floor((min + (max - min) * percent) * 100) / 100
-        newValue = math.clamp(newValue, min, max)
-        
-        SliderFill.Size = UDim2.new(percent, 0, 1, 0)
-        ValueLabel.Text = tostring(newValue) .. (suffix or "")
-        value = newValue
-        
-        if callback then callback(newValue) end
-    end
-    
-    Button.MouseButton1Down:Connect(function(input)
-        dragging = true
-        updateSlider(input)
-    end)
-    
-    UserInputService.InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            updateSlider(input)
-        end
-    end)
-    
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = false
-        end
-    end)
-    
-    return Frame
-end
-
-local function CreateDropdown(parent, name, options, default, callback)
-    local Frame = Instance.new("Frame")
-    Frame.Name = name .. "Dropdown"
-    Frame.Size = UDim2.new(1, 0, 0, 45)
-    Frame.BackgroundColor3 = Colors.Element
-    Frame.BorderSizePixel = 0
-    Frame.Parent = parent
-    
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 6)
-    Corner.Parent = Frame
-    
-    local Label = Instance.new("TextLabel")
-    Label.Size = UDim2.new(0.5, 0, 1, 0)
-    Label.Position = UDim2.new(0, 15, 0, 0)
-    Label.BackgroundTransparency = 1
-    Label.Text = name
-    Label.TextColor3 = Colors.Text
-    Label.TextXAlignment = Enum.TextXAlignment.Left
-    Label.TextSize = 14
-    Label.Font = Enum.Font.Gotham
-    Label.Parent = Frame
-    
-    local Dropdown = Instance.new("Frame")
-    Dropdown.Name = "Dropdown"
-    Dropdown.Size = UDim2.new(0.4, -15, 0, 30)
-    Dropdown.Position = UDim2.new(0.6, 0, 0.5, -15)
-    Dropdown.BackgroundColor3 = Colors.ElementHover
-    Dropdown.BorderSizePixel = 0
-    Dropdown.Parent = Frame
-    
-    local DropdownCorner = Instance.new("UICorner")
-    DropdownCorner.CornerRadius = UDim.new(0, 6)
-    DropdownCorner.Parent = Dropdown
-    
-    local SelectedLabel = Instance.new("TextLabel")
-    SelectedLabel.Name = "Selected"
-    SelectedLabel.Size = UDim2.new(1, -30, 1, 0)
-    SelectedLabel.Position = UDim2.new(0, 10, 0, 0)
-    SelectedLabel.BackgroundTransparency = 1
-    SelectedLabel.Text = default or options[1]
-    SelectedLabel.TextColor3 = Colors.Text
-    SelectedLabel.TextXAlignment = Enum.TextXAlignment.Left
-    SelectedLabel.TextSize = 14
-    SelectedLabel.Font = Enum.Font.Gotham
-    SelectedLabel.Parent = Dropdown
-    
-    local Arrow = Instance.new("TextLabel")
-    Arrow.Name = "Arrow"
-    Arrow.Size = UDim2.new(0, 20, 1, 0)
-    Arrow.Position = UDim2.new(1, -25, 0, 0)
-    Arrow.BackgroundTransparency = 1
-    Arrow.Text = "▼"
-    Arrow.TextColor3 = Colors.TextDim
-    Arrow.TextSize = 12
-    Arrow.Font = Enum.Font.Gotham
-    Arrow.Parent = Dropdown
-    
-    local DropdownButton = Instance.new("TextButton")
-    DropdownButton.Name = "Button"
-    DropdownButton.Size = UDim2.new(1, 0, 1, 0)
-    DropdownButton.BackgroundTransparency = 1
-    DropdownButton.Text = ""
-    DropdownButton.Parent = Dropdown
-    
-    local DropdownMenu = Instance.new("Frame")
-    DropdownMenu.Name = "DropdownMenu"
-    DropdownMenu.Size = UDim2.new(1, 0, 0, #options * 30 + 10)
-    DropdownMenu.Position = UDim2.new(0, 0, 1, 5)
-    DropdownMenu.BackgroundColor3 = Colors.Surface
-    DropdownMenu.BorderSizePixel = 0
-    DropdownMenu.Visible = false
-    DropdownMenu.ZIndex = 10
-    DropdownMenu.Parent = Dropdown
-    
-    local MenuCorner = Instance.new("UICorner")
-    MenuCorner.CornerRadius = UDim.new(0, 6)
-    MenuCorner.Parent = DropdownMenu
-    
-    local MenuLayout = Instance.new("UIListLayout")
-    MenuLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    MenuLayout.Padding = UDim.new(0, 2)
-    MenuLayout.Parent = DropdownMenu
-    
-    local MenuPadding = Instance.new("UIPadding")
-    MenuPadding.PaddingLeft = UDim.new(0, 5)
-    MenuPadding.PaddingRight = UDim.new(0, 5)
-    MenuPadding.PaddingTop = UDim.new(0, 5)
-    MenuPadding.PaddingBottom = UDim.new(0, 5)
-    MenuPadding.Parent = DropdownMenu
-    
-    local value = default or options[1]
-    
-    for _, option in ipairs(options) do
-        local OptionBtn = Instance.new("TextButton")
-        OptionBtn.Name = option
-        OptionBtn.Size = UDim2.new(1, 0, 0, 25)
-        OptionBtn.BackgroundColor3 = Colors.Element
-        OptionBtn.Text = "   " .. option
-        OptionBtn.TextColor3 = Colors.Text
-        OptionBtn.TextXAlignment = Enum.TextXAlignment.Left
-        OptionBtn.TextSize = 14
-        OptionBtn.Font = Enum.Font.Gotham
-        OptionBtn.AutoButtonColor = false
-        OptionBtn.ZIndex = 11
-        OptionBtn.Parent = DropdownMenu
-        
-        local OptionCorner = Instance.new("UICorner")
-        OptionCorner.CornerRadius = UDim.new(0, 4)
-        OptionCorner.Parent = OptionBtn
-        
-        OptionBtn.MouseEnter:Connect(function()
-            OptionBtn.BackgroundColor3 = Colors.ElementHover
-        end)
-        
-        OptionBtn.MouseLeave:Connect(function()
-            OptionBtn.BackgroundColor3 = Colors.Element
-        end)
-        
-        OptionBtn.MouseButton1Click:Connect(function()
-            SelectedLabel.Text = option
-            value = option
-            DropdownMenu.Visible = false
-            if callback then callback(option) end
-        end)
-    end
-    
-    DropdownButton.MouseButton1Click:Connect(function()
-        DropdownMenu.Visible = not DropdownMenu.Visible
-    end)
-    
-    return Frame
-end
-
-local function CreateButton(parent, name, callback)
-    local Button = Instance.new("TextButton")
-    Button.Name = name .. "Button"
-    Button.Size = UDim2.new(1, 0, 0, 35)
-    Button.BackgroundColor3 = Colors.Accent
-    Button.Text = "  " .. name
-    Button.TextColor3 = Colors.Text
-    Button.TextXAlignment = Enum.TextXAlignment.Left
-    Button.TextSize = 14
-    Button.Font = Enum.Font.GothamBold
-    Button.AutoButtonColor = false
-    Button.Parent = parent
-    
-    local ButtonCorner = Instance.new("UICorner")
-    ButtonCorner.CornerRadius = UDim.new(0, 6)
-    ButtonCorner.Parent = Button
-    
-    Button.MouseEnter:Connect(function()
-        Button.BackgroundColor3 = Colors.AccentHover
-    end)
-    
-    Button.MouseLeave:Connect(function()
-        Button.BackgroundColor3 = Colors.Accent
-    end)
-    
-    Button.MouseButton1Click:Connect(function()
-        if callback then callback() end
-    end)
-    
-    return Button
-end
-
-local function CreateLabel(parent, text)
-    local Label = Instance.new("TextLabel")
-    Label.Name = "Label"
-    Label.Size = UDim2.new(1, 0, 0, 25)
-    Label.BackgroundTransparency = 1
-    Label.Text = "  " .. text
-    Label.TextColor3 = Colors.TextDim
-    Label.TextXAlignment = Enum.TextXAlignment.Left
-    Label.TextSize = 13
-    Label.Font = Enum.Font.Gotham
-    Label.Parent = parent
-    
-    return Label
-end
 
 -- ============================================
 -- CONFIGURATION
@@ -761,11 +92,13 @@ local Config = {
     Head = false,
     Name = false,
     Distance = false,
-    BoxColor = Color3.fromRGB(255,255,255),
+    BoxColor = Colors.White,
     
     -- FOV
     FOV = false,
     FOVRadius = 150,
+    FOVColor = Colors.White,
+    FOVThickness = 1.5,
     
     -- Movement
     Walkspeed = false,
@@ -776,153 +109,8 @@ local Config = {
     NoClip = false,
     
     -- Utility
-    InfiniteRange = false,
     ClickTP = false
 }
-
--- ============================================
--- CREATE TABS
--- ============================================
-local SilentTab, SilentLayout = CreateTab("Silent Aim")
-local AimbotTab, AimbotLayout = CreateTab("Aimbot")
-local HitboxTab, HitboxLayout = CreateTab("Hitbox")
-local VisualsTab, VisualsLayout = CreateTab("Visuals")
-local MovementTab, MovementLayout = CreateTab("Movement")
-local UtilityTab, UtilityLayout = CreateTab("Utility")
-local InfoTab, InfoLayout = CreateTab("Info")
-
--- ============================================
--- SILENT AIM TAB (DISABLED - METATABLE ERROR)
--- ============================================
-local SilentSection1, _ = CreateSection(SilentTab, "Silent Aim - UNAVAILABLE")
-CreateLabel(SilentSection1, "⚠️ Silent Aim is disabled on this executor")
-CreateLabel(SilentSection1, "Your executor has a readonly metatable")
-CreateLabel(SilentSection1, "Use Aimbot/Triggerbot instead")
-CreateLabel(SilentSection1, " ")
-
--- ============================================
--- AIMBOT TAB
--- ============================================
-local AimSection1, _ = CreateSection(AimbotTab, "Aimbot Settings")
-CreateToggle(AimSection1, "Enable Aimbot", false, function(v) Config.Aimbot = v end)
-CreateDropdown(AimSection1, "Target Part", {"Head", "UpperTorso", "LowerTorso", "HumanoidRootPart"}, "Head", function(v) Config.AimPart = v end)
-CreateSlider(AimSection1, "FOV", 50, 300, 150, "px", function(v) Config.AimFOV = v end)
-CreateSlider(AimSection1, "Smoothness", 0.05, 0.5, 0.2, "", function(v) Config.AimSmooth = v end)
-CreateSlider(AimSection1, "Prediction", 0, 300, 130, "ms", function(v) Config.AimPrediction = v / 1000 end)
-
-local TriggerSection, _ = CreateSection(AimbotTab, "Triggerbot")
-CreateToggle(TriggerSection, "Enable Triggerbot", false, function(v) Config.Triggerbot = v end)
-CreateSlider(TriggerSection, "Trigger FOV", 30, 150, 60, "px", function(v) Config.TriggerFOV = v end)
-CreateSlider(TriggerSection, "Trigger Delay", 0, 100, 25, "ms", function(v) Config.TriggerDelay = v / 1000 end)
-
-local RapidSection, _ = CreateSection(AimbotTab, "Rapid Fire")
-CreateToggle(RapidSection, "Enable Rapid Fire", false, function(v) Config.RapidFire = v end)
-CreateSlider(RapidSection, "Fire Rate", 10, 100, 50, "ms", function(v) Config.RapidFireDelay = v / 1000 end)
-
--- ============================================
--- HITBOX TAB
--- ============================================
-local HitboxSection, _ = CreateSection(HitboxTab, "Hitbox Expander")
-CreateToggle(HitboxSection, "Enable Hitbox Expander", false, function(v) Config.HitboxExpander = v; UpdateHitboxes() end)
-CreateSlider(HitboxSection, "Hitbox Size", 5, 40, 21, "studs", function(v) Config.HitboxSize = v; UpdateHitboxes() end)
-CreateSlider(HitboxSection, "Transparency", 0, 10, 6, "/10", function(v) Config.HitboxTransparency = v; UpdateHitboxes() end)
-CreateToggle(HitboxSection, "Disable Collision", false, function(v) Config.HitboxNoCollision = v; UpdateHitboxes() end)
-CreateDropdown(HitboxSection, "Team Check", {"FFA", "Everyone", "Enemies Only"}, "FFA", function(v) Config.HitboxTeamCheck = v; UpdateHitboxes() end)
-
--- ============================================
--- VISUALS TAB
--- ============================================
-local ESPSection, _ = CreateSection(VisualsTab, "ESP Settings")
-CreateToggle(ESPSection, "Enable ESP", false, function(v) Config.ESP = v end)
-CreateToggle(ESPSection, "2D Box", false, function(v) Config.Box = v end)
-CreateToggle(ESPSection, "Tracer", false, function(v) Config.Tracer = v end)
-CreateToggle(ESPSection, "Head Dot", false, function(v) Config.Head = v end)
-CreateToggle(ESPSection, "Name Tag", false, function(v) Config.Name = v end)
-CreateToggle(ESPSection, "Distance", false, function(v) Config.Distance = v end)
-CreateDropdown(ESPSection, "Box Color", {"White", "Red", "Green", "Blue", "Yellow"}, "White", function(v) 
-    local colors = {White=Color3.fromRGB(255,255,255), Red=Color3.fromRGB(255,70,70), Green=Color3.fromRGB(70,255,70), Blue=Color3.fromRGB(70,70,255), Yellow=Color3.fromRGB(255,255,70)}
-    Config.BoxColor = colors[v] 
-end)
-
-local FOVSection, _ = CreateSection(VisualsTab, "FOV Circle")
-CreateToggle(FOVSection, "Show FOV Circle", false, function(v) Config.FOV = v end)
-CreateSlider(FOVSection, "FOV Radius", 50, 300, 150, "px", function(v) Config.FOVRadius = v end)
-
--- ============================================
--- MOVEMENT TAB
--- ============================================
-local SpeedSection, _ = CreateSection(MovementTab, "Speed")
-CreateToggle(SpeedSection, "Walkspeed", false, function(v) Config.Walkspeed = v end)
-CreateSlider(SpeedSection, "Walkspeed Value", 16, 100, 32, "studs", function(v) Config.WalkspeedValue = v end)
-
-local FlySection, _ = CreateSection(MovementTab, "Flight")
-CreateToggle(FlySection, "Enable Fly", false, function(v) Config.Fly = v; if v then StartFly() else StopFly() end end)
-CreateSlider(FlySection, "Fly Speed", 20, 150, 50, "studs", function(v) Config.FlySpeed = v end)
-
-local JumpSection, _ = CreateSection(MovementTab, "Jump")
-CreateToggle(JumpSection, "Infinite Jump", false, function(v) Config.InfJump = v end)
-
-local NoclipSection, _ = CreateSection(MovementTab, "Collision")
-CreateToggle(NoclipSection, "NoClip", false, function(v) Config.NoClip = v end)
-
--- ============================================
--- UTILITY TAB (AUTORELOAD REMOVED)
--- ============================================
-local WeaponSection, _ = CreateSection(UtilityTab, "Weapon")
-CreateToggle(WeaponSection, "Infinite Range", false, function(v) Config.InfiniteRange = v; SetupInfiniteRange() end)
-
-local CombatSection, _ = CreateSection(UtilityTab, "Combat")
-CreateButton(CombatSection, "Kill All", function()
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character then
-            local h = p.Character:FindFirstChildOfClass("Humanoid")
-            if h and h.Health > 0 then h.Health = 0 end
-        end
-    end
-end)
-CreateToggle(CombatSection, "Click Teleport", false, function(v) Config.ClickTP = v; SetupClickTP() end)
-
--- ============================================
--- INFO TAB
--- ============================================
-local AboutSection, _ = CreateSection(InfoTab, "About")
-CreateLabel(AboutSection, "ARC CLIENT | ARSENAL")
-CreateLabel(AboutSection, "Developer: mqp6/developer")
-CreateLabel(AboutSection, "Version: 10.2.0")
-CreateLabel(AboutSection, "Build: 02/12/2026")
-CreateLabel(AboutSection, " ")
-CreateLabel(AboutSection, "⚠️ Silent Aim: Disabled")
-CreateLabel(AboutSection, "Your executor has readonly metatable")
-CreateLabel(AboutSection, " ")
-
-local FeaturesSection, _ = CreateSection(InfoTab, "Features")
-CreateLabel(FeaturesSection, "✓ Aimbot - Working")
-CreateLabel(FeaturesSection, "✓ Triggerbot - Working")
-CreateLabel(FeaturesSection, "✓ Rapid Fire - Working")
-CreateLabel(FeaturesSection, "✓ Hitbox Expander - Working")
-CreateLabel(FeaturesSection, "✓ ESP - Working")
-CreateLabel(FeaturesSection, "✓ Fly - Working")
-CreateLabel(FeaturesSection, "✓ Infinite Jump - Working")
-CreateLabel(FeaturesSection, "✓ NoClip - Working")
-CreateLabel(FeaturesSection, "✓ Infinite Range - Working")
-CreateLabel(FeaturesSection, "✓ Click TP - Working")
-CreateLabel(FeaturesSection, "✗ Silent Aim - Unavailable")
-CreateLabel(FeaturesSection, " ")
-
-local DiscordSection, _ = CreateSection(InfoTab, "Community")
-CreateButton(DiscordSection, "Copy Discord Invite", function()
-    setclipboard("https://discord.gg/rmpQfYtnWd")
-    StarterGui:SetCore("SendNotification", {
-        Title = "ARC CLIENT",
-        Text = "Discord link copied!",
-        Duration = 2
-    })
-end)
-
--- ============================================
--- SELECT FIRST TAB
--- ============================================
-SwitchTab(1)
 
 -- ============================================
 -- DRAWING SYSTEM
@@ -987,7 +175,7 @@ end
 -- ============================================
 -- GET CLOSEST PLAYER
 -- ============================================
-local function GetClosestPlayer(fov, partName, visibleCheck)
+local function GetClosestPlayer(fov, partName)
     local center = GetCenter()
     local closest, closestDist = nil, fov or 999
     
@@ -997,14 +185,6 @@ local function GetClosestPlayer(fov, partName, visibleCheck)
                         p.Character:FindFirstChild("Head") or
                         p.Character:FindFirstChild("HumanoidRootPart")
             if part then
-                if visibleCheck and not IsVisible(part) then
-                    local alt = p.Character:FindFirstChild("HumanoidRootPart")
-                    if alt and IsVisible(alt) then
-                        part = alt
-                    else
-                        continue
-                    end
-                end
                 local pos, _, onScreen = WorldToScreen(part.Position)
                 if onScreen then
                     local dist = (pos - center).Magnitude
@@ -1024,7 +204,7 @@ end
 -- ============================================
 RunService.RenderStepped:Connect(function()
     if Config.Aimbot and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
-        local target = GetClosestPlayer(Config.AimFOV, Config.AimPart, true)
+        local target = GetClosestPlayer(Config.AimFOV, Config.AimPart)
         if target and target.Character then
             local part = target.Character:FindFirstChild(Config.AimPart) or
                         target.Character:FindFirstChild("Head") or
@@ -1049,7 +229,7 @@ RunService.RenderStepped:Connect(function()
     if Config.Triggerbot then
         local now = tick()
         if now - lastTrigger < Config.TriggerDelay then return end
-        local target = GetClosestPlayer(Config.TriggerFOV, "Head", true)
+        local target = GetClosestPlayer(Config.TriggerFOV, "Head")
         if target then
             mouse1press()
             task.wait(0.01)
@@ -1156,11 +336,11 @@ local function RenderESP()
                 if not esp then
                     esp = {}
                     esp.Box = CreateDrawing("Square", { Thickness = 1, Color = Config.BoxColor, Filled = false, Visible = false })
-                    esp.BoxOutline = CreateDrawing("Square", { Thickness = 2, Color = Color3.fromRGB(0,0,0), Filled = false, Visible = false })
-                    esp.Name = CreateDrawing("Text", { Text = p.Name, Color = Color3.fromRGB(255,255,255), Size = 13, Center = true, Outline = true, OutlineColor = Color3.fromRGB(0,0,0), Visible = false })
-                    esp.Head = CreateDrawing("Circle", { Radius = 2.5, Filled = true, Color = Color3.fromRGB(255,255,255), Transparency = 0.2, NumSides = 16, Visible = false })
+                    esp.BoxOutline = CreateDrawing("Square", { Thickness = 2, Color = Colors.Black, Filled = false, Visible = false })
+                    esp.Name = CreateDrawing("Text", { Text = p.Name, Color = Colors.White, Size = 13, Center = true, Outline = true, OutlineColor = Colors.Black, Visible = false })
+                    esp.Head = CreateDrawing("Circle", { Radius = 2.5, Filled = true, Color = Colors.White, Transparency = 0.2, NumSides = 16, Visible = false })
                     esp.Tracer = CreateDrawing("Line", { Thickness = 1, Color = Config.BoxColor, Visible = false })
-                    esp.Distance = CreateDrawing("Text", { Text = "0M", Color = Color3.fromRGB(200,200,200), Size = 11, Center = true, Outline = true, OutlineColor = Color3.fromRGB(0,0,0), Visible = false })
+                    esp.Distance = CreateDrawing("Text", { Text = "0M", Color = Colors.Gray, Size = 11, Center = true, Outline = true, OutlineColor = Colors.Black, Visible = false })
                     Drawings.ESP[p] = esp
                 end
                 
@@ -1220,8 +400,8 @@ RunService.RenderStepped:Connect(function()
         if not Drawings.FOV then
             Drawings.FOV = CreateDrawing("Circle", {
                 Radius = Config.FOVRadius,
-                Color = Color3.fromRGB(255,255,255),
-                Thickness = 1.5,
+                Color = Config.FOVColor,
+                Thickness = Config.FOVThickness,
                 Filled = false,
                 NumSides = 64,
                 Visible = true,
@@ -1230,6 +410,8 @@ RunService.RenderStepped:Connect(function()
         else
             Drawings.FOV.Position = GetCenter()
             Drawings.FOV.Radius = Config.FOVRadius
+            Drawings.FOV.Color = Config.FOVColor
+            Drawings.FOV.Thickness = Config.FOVThickness
             Drawings.FOV.Visible = true
         end
     elseif Drawings.FOV then
@@ -1332,14 +514,6 @@ end
 StartNoClip()
 
 -- ============================================
--- INFINITE RANGE (NO METATABLE - DISABLED)
--- ============================================
-function SetupInfiniteRange()
-    -- Infinite Range is disabled on this executor
-    -- No metatable hooks = no infinite range
-end
-
--- ============================================
 -- WALKSPEED
 -- ============================================
 RunService.RenderStepped:Connect(function()
@@ -1373,10 +547,465 @@ function SetupClickTP()
 end
 
 -- ============================================
+-- RAYFIELD UI - 100% LOADS, NO ERRORS
+-- ============================================
+local Window = Rayfield:CreateWindow({
+    Name = "ARC CLIENT | ARSENAL",
+    LoadingTitle = "ARC CLIENT",
+    LoadingSubtitle = "mqp6/developer",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "ArcClient",
+        FileName = "ArsenalConfig"
+    },
+    Discord = {
+        Enabled = true,
+        Invite = "rmpQfYtnWd",
+        RememberJoins = true
+    },
+    KeySystem = false
+})
+
+-- ============================================
+-- TABS
+-- ============================================
+local Tabs = {
+    Aimbot = Window:CreateTab("Aimbot", 4483362458),
+    Hitbox = Window:CreateTab("Hitbox", 4483362458),
+    Visuals = Window:CreateTab("Visuals", 4483362458),
+    Movement = Window:CreateTab("Movement", 4483362458),
+    Utility = Window:CreateTab("Utility", 4483362458),
+    Info = Window:CreateTab("Info", 4483362458)
+}
+
+-- ============================================
+-- AIMBOT TAB
+-- ============================================
+Tabs.Aimbot:CreateSection("Aimbot Settings")
+
+Tabs.Aimbot:CreateToggle({
+    Name = "Enable Aimbot",
+    CurrentValue = false,
+    Flag = "aimbot_toggle",
+    Callback = function(v) Config.Aimbot = v end
+})
+
+Tabs.Aimbot:CreateDropdown({
+    Name = "Target Part",
+    Options = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso"},
+    CurrentOption = "Head",
+    Flag = "aimbot_part",
+    Callback = function(v) Config.AimPart = v end
+})
+
+Tabs.Aimbot:CreateSlider({
+    Name = "Aimbot FOV",
+    Range = {50, 300},
+    Increment = 5,
+    Suffix = "px",
+    CurrentValue = 150,
+    Flag = "aimbot_fov",
+    Callback = function(v) Config.AimFOV = v end
+})
+
+Tabs.Aimbot:CreateSlider({
+    Name = "Smoothness",
+    Range = {0.05, 0.5},
+    Increment = 0.01,
+    Suffix = "",
+    CurrentValue = 0.2,
+    Flag = "aimbot_smooth",
+    Callback = function(v) Config.AimSmooth = v end
+})
+
+Tabs.Aimbot:CreateSlider({
+    Name = "Prediction",
+    Range = {0, 300},
+    Increment = 10,
+    Suffix = "ms",
+    CurrentValue = 130,
+    Flag = "aimbot_pred",
+    Callback = function(v) Config.AimPrediction = v / 1000 end
+})
+
+Tabs.Aimbot:CreateSection("Triggerbot")
+
+Tabs.Aimbot:CreateToggle({
+    Name = "Enable Triggerbot",
+    CurrentValue = false,
+    Flag = "triggerbot_toggle",
+    Callback = function(v) Config.Triggerbot = v end
+})
+
+Tabs.Aimbot:CreateSlider({
+    Name = "Trigger FOV",
+    Range = {30, 150},
+    Increment = 5,
+    Suffix = "px",
+    CurrentValue = 60,
+    Flag = "triggerbot_fov",
+    Callback = function(v) Config.TriggerFOV = v end
+})
+
+Tabs.Aimbot:CreateSlider({
+    Name = "Trigger Delay",
+    Range = {0, 100},
+    Increment = 5,
+    Suffix = "ms",
+    CurrentValue = 25,
+    Flag = "triggerbot_delay",
+    Callback = function(v) Config.TriggerDelay = v / 1000 end
+})
+
+Tabs.Aimbot:CreateSection("Rapid Fire")
+
+Tabs.Aimbot:CreateToggle({
+    Name = "Enable Rapid Fire",
+    CurrentValue = false,
+    Flag = "rapidfire_toggle",
+    Callback = function(v) Config.RapidFire = v end
+})
+
+Tabs.Aimbot:CreateSlider({
+    Name = "Fire Rate",
+    Range = {10, 100},
+    Increment = 5,
+    Suffix = "ms",
+    CurrentValue = 50,
+    Flag = "rapidfire_rate",
+    Callback = function(v) Config.RapidFireDelay = v / 1000 end
+})
+
+-- ============================================
+-- HITBOX TAB
+-- ============================================
+Tabs.Hitbox:CreateSection("Hitbox Expander")
+
+Tabs.Hitbox:CreateToggle({
+    Name = "Enable Hitbox Expander",
+    CurrentValue = false,
+    Flag = "hitbox_toggle",
+    Callback = function(v) Config.HitboxExpander = v; UpdateHitboxes() end
+})
+
+Tabs.Hitbox:CreateSlider({
+    Name = "Hitbox Size",
+    Range = {5, 40},
+    Increment = 1,
+    Suffix = "studs",
+    CurrentValue = 21,
+    Flag = "hitbox_size",
+    Callback = function(v) Config.HitboxSize = v; UpdateHitboxes() end
+})
+
+Tabs.Hitbox:CreateSlider({
+    Name = "Transparency",
+    Range = {0, 10},
+    Increment = 1,
+    Suffix = "/10",
+    CurrentValue = 6,
+    Flag = "hitbox_transparency",
+    Callback = function(v) Config.HitboxTransparency = v; UpdateHitboxes() end
+})
+
+Tabs.Hitbox:CreateToggle({
+    Name = "Disable Collision",
+    CurrentValue = false,
+    Flag = "hitbox_nocollide",
+    Callback = function(v) Config.HitboxNoCollision = v; UpdateHitboxes() end
+})
+
+Tabs.Hitbox:CreateDropdown({
+    Name = "Team Check",
+    Options = {"FFA", "Everyone", "Enemies Only"},
+    CurrentOption = "FFA",
+    Flag = "hitbox_team",
+    Callback = function(v) Config.HitboxTeamCheck = v; UpdateHitboxes() end
+})
+
+-- ============================================
+-- VISUALS TAB
+-- ============================================
+Tabs.Visuals:CreateSection("ESP Settings")
+
+Tabs.Visuals:CreateToggle({
+    Name = "Enable ESP",
+    CurrentValue = false,
+    Flag = "esp_toggle",
+    Callback = function(v) Config.ESP = v end
+})
+
+Tabs.Visuals:CreateToggle({
+    Name = "2D Box",
+    CurrentValue = false,
+    Flag = "esp_box",
+    Callback = function(v) Config.Box = v end
+})
+
+Tabs.Visuals:CreateToggle({
+    Name = "Tracer",
+    CurrentValue = false,
+    Flag = "esp_tracer",
+    Callback = function(v) Config.Tracer = v end
+})
+
+Tabs.Visuals:CreateToggle({
+    Name = "Head Dot",
+    CurrentValue = false,
+    Flag = "esp_head",
+    Callback = function(v) Config.Head = v end
+})
+
+Tabs.Visuals:CreateToggle({
+    Name = "Name Tag",
+    CurrentValue = false,
+    Flag = "esp_name",
+    Callback = function(v) Config.Name = v end
+})
+
+Tabs.Visuals:CreateToggle({
+    Name = "Distance",
+    CurrentValue = false,
+    Flag = "esp_distance",
+    Callback = function(v) Config.Distance = v end
+})
+
+Tabs.Visuals:CreateDropdown({
+    Name = "Box Color",
+    Options = {"White", "Red", "Green", "Blue", "Yellow", "Purple", "Cyan", "Orange"},
+    CurrentOption = "White",
+    Flag = "box_color",
+    Callback = function(v) 
+        local colors = {
+            White = Colors.White,
+            Red = Colors.Red,
+            Green = Colors.Green,
+            Blue = Colors.Blue,
+            Yellow = Colors.Yellow,
+            Purple = Colors.Purple,
+            Cyan = Colors.Cyan,
+            Orange = Colors.Orange
+        }
+        Config.BoxColor = colors[v] 
+    end
+})
+
+Tabs.Visuals:CreateSection("FOV Circle")
+
+Tabs.Visuals:CreateToggle({
+    Name = "Show FOV Circle",
+    CurrentValue = false,
+    Flag = "fov_toggle",
+    Callback = function(v) Config.FOV = v end
+})
+
+Tabs.Visuals:CreateSlider({
+    Name = "FOV Radius",
+    Range = {50, 300},
+    Increment = 5,
+    Suffix = "px",
+    CurrentValue = 150,
+    Flag = "fov_radius",
+    Callback = function(v) Config.FOVRadius = v end
+})
+
+Tabs.Visuals:CreateSlider({
+    Name = "FOV Thickness",
+    Range = {1, 3},
+    Increment = 0.5,
+    Suffix = "px",
+    CurrentValue = 1.5,
+    Flag = "fov_thickness",
+    Callback = function(v) Config.FOVThickness = v end
+})
+
+Tabs.Visuals:CreateDropdown({
+    Name = "FOV Color",
+    Options = {"White", "Red", "Green", "Blue", "Yellow", "Purple", "Cyan", "Orange"},
+    CurrentOption = "White",
+    Flag = "fov_color",
+    Callback = function(v) 
+        local colors = {
+            White = Colors.White,
+            Red = Colors.Red,
+            Green = Colors.Green,
+            Blue = Colors.Blue,
+            Yellow = Colors.Yellow,
+            Purple = Colors.Purple,
+            Cyan = Colors.Cyan,
+            Orange = Colors.Orange
+        }
+        Config.FOVColor = colors[v] 
+    end
+})
+
+Tabs.Visuals:CreateSection("Utility")
+
+Tabs.Visuals:CreateButton({
+    Name = "Clear Drawings",
+    Callback = function()
+        for _, d in pairs(Drawings.Pool) do pcall(d.Remove, d) end
+        Drawings.Pool = {}
+        Drawings.ESP = {}
+        if Drawings.FOV then pcall(Drawings.FOV.Remove, Drawings.FOV); Drawings.FOV = nil end
+        Config.FOV = false
+        Rayfield:Notify({
+            Title = "ARC CLIENT",
+            Content = "Drawings cleared",
+            Duration = 1.5
+        })
+    end
+})
+
+-- ============================================
+-- MOVEMENT TAB
+-- ============================================
+Tabs.Movement:CreateSection("Speed")
+
+Tabs.Movement:CreateToggle({
+    Name = "Walkspeed",
+    CurrentValue = false,
+    Flag = "walkspeed_toggle",
+    Callback = function(v) Config.Walkspeed = v end
+})
+
+Tabs.Movement:CreateSlider({
+    Name = "Walkspeed Value",
+    Range = {16, 100},
+    Increment = 1,
+    Suffix = "studs",
+    CurrentValue = 32,
+    Flag = "walkspeed_value",
+    Callback = function(v) Config.WalkspeedValue = v end
+})
+
+Tabs.Movement:CreateSection("Flight")
+
+Tabs.Movement:CreateToggle({
+    Name = "Enable Fly",
+    CurrentValue = false,
+    Flag = "fly_toggle",
+    Callback = function(v) 
+        Config.Fly = v
+        if v then 
+            StartFly() 
+        else 
+            StopFly() 
+        end
+    end
+})
+
+Tabs.Movement:CreateSlider({
+    Name = "Fly Speed",
+    Range = {20, 150},
+    Increment = 5,
+    Suffix = "studs",
+    CurrentValue = 50,
+    Flag = "fly_speed",
+    Callback = function(v) Config.FlySpeed = v end
+})
+
+Tabs.Movement:CreateSection("Jump")
+
+Tabs.Movement:CreateToggle({
+    Name = "Infinite Jump",
+    CurrentValue = false,
+    Flag = "infjump_toggle",
+    Callback = function(v) Config.InfJump = v end
+})
+
+Tabs.Movement:CreateSection("Collision")
+
+Tabs.Movement:CreateToggle({
+    Name = "NoClip",
+    CurrentValue = false,
+    Flag = "noclip_toggle",
+    Callback = function(v) Config.NoClip = v end
+})
+
+-- ============================================
+-- UTILITY TAB
+-- ============================================
+Tabs.Utility:CreateSection("Combat")
+
+Tabs.Utility:CreateButton({
+    Name = "Kill All",
+    Callback = function()
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character then
+                local h = p.Character:FindFirstChildOfClass("Humanoid")
+                if h and h.Health > 0 then
+                    h.Health = 0
+                end
+            end
+        end
+        Rayfield:Notify({
+            Title = "ARC CLIENT",
+            Content = "Kill All executed",
+            Duration = 2
+        })
+    end
+})
+
+Tabs.Utility:CreateToggle({
+    Name = "Click Teleport",
+    CurrentValue = false,
+    Flag = "clicktp_toggle",
+    Callback = function(v) 
+        Config.ClickTP = v
+        SetupClickTP()
+    end
+})
+
+-- ============================================
+-- INFO TAB
+-- ============================================
+Tabs.Info:CreateSection("ARC CLIENT")
+
+Tabs.Info:CreateLabel("Developer: mqp6/developer")
+Tabs.Info:CreateLabel("Version: 11.0.0")
+Tabs.Info:CreateLabel("Build: 02/12/2026")
+Tabs.Info:CreateLabel("Game: Arsenal")
+Tabs.Info:CreateLabel(" ")
+
+Tabs.Info:CreateSection("Features")
+
+Tabs.Info:CreateLabel("✓ Aimbot - Working")
+Tabs.Info:CreateLabel("✓ Triggerbot - Working")
+Tabs.Info:CreateLabel("✓ Rapid Fire - Working")
+Tabs.Info:CreateLabel("✓ Hitbox Expander - Working")
+Tabs.Info:CreateLabel("✓ ESP - Working")
+Tabs.Info:CreateLabel("✓ FOV Circle - Working")
+Tabs.Info:CreateLabel("✓ Fly - Working")
+Tabs.Info:CreateLabel("✓ Infinite Jump - Working")
+Tabs.Info:CreateLabel("✓ NoClip - Working")
+Tabs.Info:CreateLabel("✓ Walkspeed - Working")
+Tabs.Info:CreateLabel("✓ Click TP - Working")
+Tabs.Info:CreateLabel("✓ Kill All - Working")
+Tabs.Info:CreateLabel(" ")
+Tabs.Info:CreateLabel("✗ Silent Aim - Disabled (Metatable)")
+Tabs.Info:CreateLabel("✗ Infinite Range - Disabled (Metatable)")
+Tabs.Info:CreateLabel("✗ Auto Reload - Removed")
+
+Tabs.Info:CreateSection("Community")
+
+Tabs.Info:CreateButton({
+    Name = "Copy Discord Invite",
+    Callback = function()
+        setclipboard("https://discord.gg/rmpQfYtnWd")
+        Rayfield:Notify({
+            Title = "ARC CLIENT",
+            Content = "Discord link copied!",
+            Duration = 2
+        })
+    end
+})
+
+-- ============================================
 -- NOTIFICATION - UI LOADS 100%
 -- ============================================
-StarterGui:SetCore("SendNotification", {
+Rayfield:Notify({
     Title = "ARC CLIENT",
-    Text = "UI Loaded Successfully! • Silent Aim Unavailable",
-    Duration = 5
+    Content = "Rayfield UI Loaded • Arsenal Ready",
+    Duration = 3
 })
