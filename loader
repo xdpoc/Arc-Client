@@ -24,16 +24,6 @@ local Camera = Workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 
--- Arsenal Detection
-if game.PlaceId ~= 286090429 and game.PlaceId ~= 296077173 and game.PlaceId ~= 3429889639 then
-    StarterGui:SetCore("SendNotification", {
-        Title = "ARC CLIENT",
-        Text = "This script is for ARSENAL only!",
-        Duration = 5
-    })
-    return
-end
-
 -- ============================================
 -- CUSTOM IMGUI UI SYSTEM (Rayfield Style)
 -- ============================================
@@ -63,7 +53,7 @@ ArcUI.Colors = {
 -- Key System
 ArcUI.KeySystem = {
     Enabled = true,
-    Key = "ARC-2026-ARSENAL",
+    Key = "free",
     Unlocked = false,
     Attempts = 0
 }
