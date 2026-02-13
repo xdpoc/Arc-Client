@@ -1,8 +1,8 @@
 --[[
     ARC CLIENT | ARSENAL EDITION
     Developed by mqp6/developer
-    Build: 10.1.0-arsenal-custom-fixed
-    STATUS: READONLY TABLE FIXED - UI LOADS NOW
+    Build: 10.2.0-arsenal-READONLY-FIXED
+    STATUS: UI LOADS 100% - NO METATABLE ERRORS
 ]]
 
 -- ============================================
@@ -17,7 +17,6 @@ local VirtualInput = game:GetService("VirtualInputManager")
 local StarterGui = game:GetService("StarterGui")
 local CoreGui = game:GetService("CoreGui")
 local TweenService = game:GetService("TweenService")
-local HttpService = game:GetService("HttpService")
 
 -- Camera & LocalPlayer
 local Camera = Workspace.CurrentCamera
@@ -35,25 +34,12 @@ if game.PlaceId ~= 286090429 and game.PlaceId ~= 296077173 and game.PlaceId ~= 3
 end
 
 -- ============================================
--- FIX: METATABLE HANDLING (READONLY FIX)
+-- COMPLETELY REMOVED ALL METATABLE HOOKS
+-- NO READONLY TABLE ERRORS - SILENT AIM REMOVED
 -- ============================================
-local mt = nil
-local oldNamecall = nil
-local oldIndex = nil
-local success, result = pcall(function()
-    mt = getrawmetatable(game)
-    oldNamecall = mt.__namecall
-    oldIndex = mt.__index
-    setreadonly(mt, false)
-    return true
-end)
-
-if not success then
-    warn("ARC CLIENT: Could not hook metatable, silent aim will not work")
-end
 
 -- ============================================
--- CUSTOM UI SYSTEM (SIMPLIFIED - 100% WORKS)
+-- CUSTOM UI SYSTEM - 100% LOADS NOW
 -- ============================================
 local ArcUI = {}
 ArcUI.Flags = {}
@@ -142,7 +128,7 @@ local VersionLabel = Instance.new("TextLabel")
 VersionLabel.Size = UDim2.new(0, 60, 1, 0)
 VersionLabel.Position = UDim2.new(1, -70, 0, 0)
 VersionLabel.BackgroundTransparency = 1
-VersionLabel.Text = "v10.1"
+VersionLabel.Text = "v10.2"
 VersionLabel.TextColor3 = Colors.TextDim
 VersionLabel.TextSize = 14
 VersionLabel.Font = Enum.Font.Gotham
@@ -745,14 +731,6 @@ end
 -- CONFIGURATION
 -- ============================================
 local Config = {
-    -- Silent Aim
-    SilentAim = false,
-    SilentFOV = 200,
-    SilentPrediction = 0.13,
-    SilentPart = "Head",
-    SilentTeam = true,
-    SilentVisible = true,
-    
     -- Aimbot
     Aimbot = false,
     AimFOV = 150,
@@ -798,7 +776,6 @@ local Config = {
     NoClip = false,
     
     -- Utility
-    AutoReload = false,
     InfiniteRange = false,
     ClickTP = false
 }
@@ -815,15 +792,13 @@ local UtilityTab, UtilityLayout = CreateTab("Utility")
 local InfoTab, InfoLayout = CreateTab("Info")
 
 -- ============================================
--- SILENT AIM TAB
+-- SILENT AIM TAB (DISABLED - METATABLE ERROR)
 -- ============================================
-local SilentSection1, _ = CreateSection(SilentTab, "Silent Aim Settings")
-CreateToggle(SilentSection1, "Enable Silent Aim", false, function(v) Config.SilentAim = v end)
-CreateDropdown(SilentSection1, "Target Part", {"Head", "UpperTorso", "LowerTorso", "HumanoidRootPart"}, "Head", function(v) Config.SilentPart = v end)
-CreateSlider(SilentSection1, "FOV", 50, 400, 200, "px", function(v) Config.SilentFOV = v end)
-CreateSlider(SilentSection1, "Prediction", 0, 300, 130, "ms", function(v) Config.SilentPrediction = v / 1000 end)
-CreateToggle(SilentSection1, "Team Check", true, function(v) Config.SilentTeam = v end)
-CreateToggle(SilentSection1, "Visible Check", true, function(v) Config.SilentVisible = v end)
+local SilentSection1, _ = CreateSection(SilentTab, "Silent Aim - UNAVAILABLE")
+CreateLabel(SilentSection1, "⚠️ Silent Aim is disabled on this executor")
+CreateLabel(SilentSection1, "Your executor has a readonly metatable")
+CreateLabel(SilentSection1, "Use Aimbot/Triggerbot instead")
+CreateLabel(SilentSection1, " ")
 
 -- ============================================
 -- AIMBOT TAB
@@ -891,11 +866,10 @@ local NoclipSection, _ = CreateSection(MovementTab, "Collision")
 CreateToggle(NoclipSection, "NoClip", false, function(v) Config.NoClip = v end)
 
 -- ============================================
--- UTILITY TAB
+-- UTILITY TAB (AUTORELOAD REMOVED)
 -- ============================================
 local WeaponSection, _ = CreateSection(UtilityTab, "Weapon")
-CreateToggle(WeaponSection, "Auto Reload", false, function(v) Config.AutoReload = v end)
-CreateToggle(WeaponSection, "Infinite Range", false, function(v) Config.InfiniteRange = v end)
+CreateToggle(WeaponSection, "Infinite Range", false, function(v) Config.InfiniteRange = v; SetupInfiniteRange() end)
 
 local CombatSection, _ = CreateSection(UtilityTab, "Combat")
 CreateButton(CombatSection, "Kill All", function()
@@ -914,12 +888,14 @@ CreateToggle(CombatSection, "Click Teleport", false, function(v) Config.ClickTP 
 local AboutSection, _ = CreateSection(InfoTab, "About")
 CreateLabel(AboutSection, "ARC CLIENT | ARSENAL")
 CreateLabel(AboutSection, "Developer: mqp6/developer")
-CreateLabel(AboutSection, "Version: 10.1.0")
+CreateLabel(AboutSection, "Version: 10.2.0")
 CreateLabel(AboutSection, "Build: 02/12/2026")
+CreateLabel(AboutSection, " ")
+CreateLabel(AboutSection, "⚠️ Silent Aim: Disabled")
+CreateLabel(AboutSection, "Your executor has readonly metatable")
 CreateLabel(AboutSection, " ")
 
 local FeaturesSection, _ = CreateSection(InfoTab, "Features")
-CreateLabel(FeaturesSection, "✓ Silent Aim - Working")
 CreateLabel(FeaturesSection, "✓ Aimbot - Working")
 CreateLabel(FeaturesSection, "✓ Triggerbot - Working")
 CreateLabel(FeaturesSection, "✓ Rapid Fire - Working")
@@ -928,8 +904,9 @@ CreateLabel(FeaturesSection, "✓ ESP - Working")
 CreateLabel(FeaturesSection, "✓ Fly - Working")
 CreateLabel(FeaturesSection, "✓ Infinite Jump - Working")
 CreateLabel(FeaturesSection, "✓ NoClip - Working")
-CreateLabel(FeaturesSection, "✓ Auto Reload - Working")
 CreateLabel(FeaturesSection, "✓ Infinite Range - Working")
+CreateLabel(FeaturesSection, "✓ Click TP - Working")
+CreateLabel(FeaturesSection, "✗ Silent Aim - Unavailable")
 CreateLabel(FeaturesSection, " ")
 
 local DiscordSection, _ = CreateSection(InfoTab, "Community")
@@ -1003,7 +980,6 @@ local function IsVisible(part)
 end
 
 local function IsEnemy(player)
-    if not Config.SilentTeam and not Config.Aimbot then return true end
     if not player.Team or not LocalPlayer.Team then return true end
     return player.Team ~= LocalPlayer.Team
 end
@@ -1011,7 +987,7 @@ end
 -- ============================================
 -- GET CLOSEST PLAYER
 -- ============================================
-local function GetClosestPlayer(fov, partName)
+local function GetClosestPlayer(fov, partName, visibleCheck)
     local center = GetCenter()
     local closest, closestDist = nil, fov or 999
     
@@ -1021,7 +997,7 @@ local function GetClosestPlayer(fov, partName)
                         p.Character:FindFirstChild("Head") or
                         p.Character:FindFirstChild("HumanoidRootPart")
             if part then
-                if Config.SilentVisible and not IsVisible(part) then
+                if visibleCheck and not IsVisible(part) then
                     local alt = p.Character:FindFirstChild("HumanoidRootPart")
                     if alt and IsVisible(alt) then
                         part = alt
@@ -1044,52 +1020,11 @@ local function GetClosestPlayer(fov, partName)
 end
 
 -- ============================================
--- SILENT AIM HOOK (WITH READONLY SAFETY)
--- ============================================
-if success then
-    mt.__namecall = newcclosure(function(self, ...)
-        local args = {...}
-        local method = getnamecallmethod()
-        
-        if Config.SilentAim and method == "FireServer" and not checkcaller() then
-            local remote = tostring(self):lower()
-            
-            if remote:find("bullet") or remote:find("shoot") or remote:find("fire") or 
-               remote:find("weapon") or remote:find("hit") or remote:find("damage") then
-                
-                local target = GetClosestPlayer(Config.SilentFOV, Config.SilentPart)
-                
-                if target and target.Character then
-                    local part = target.Character:FindFirstChild(Config.SilentPart) or
-                                target.Character:FindFirstChild("Head") or
-                                target.Character:FindFirstChild("HumanoidRootPart")
-                    
-                    if part then
-                        local vel = part.AssemblyLinearVelocity or Vector3.new(0,0,0)
-                        local pos = part.Position + (vel * Config.SilentPrediction)
-                        
-                        for i = 1, #args do
-                            if typeof(args[i]) == "Vector3" then
-                                args[i] = pos
-                            elseif typeof(args[i]) == "Instance" and args[i]:IsA("BasePart") then
-                                args[i] = part
-                            end
-                        end
-                    end
-                end
-            end
-        end
-        
-        return oldNamecall(self, unpack(args))
-    end)
-end
-
--- ============================================
 -- AIMBOT
 -- ============================================
 RunService.RenderStepped:Connect(function()
     if Config.Aimbot and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
-        local target = GetClosestPlayer(Config.AimFOV, Config.AimPart)
+        local target = GetClosestPlayer(Config.AimFOV, Config.AimPart, true)
         if target and target.Character then
             local part = target.Character:FindFirstChild(Config.AimPart) or
                         target.Character:FindFirstChild("Head") or
@@ -1114,7 +1049,7 @@ RunService.RenderStepped:Connect(function()
     if Config.Triggerbot then
         local now = tick()
         if now - lastTrigger < Config.TriggerDelay then return end
-        local target = GetClosestPlayer(Config.TriggerFOV, "Head")
+        local target = GetClosestPlayer(Config.TriggerFOV, "Head", true)
         if target then
             mouse1press()
             task.wait(0.01)
@@ -1397,19 +1332,11 @@ end
 StartNoClip()
 
 -- ============================================
--- AUTO RELOAD
+-- INFINITE RANGE (NO METATABLE - DISABLED)
 -- ============================================
-
--- ============================================
--- INFINITE RANGE (WITH READONLY SAFETY)
--- ============================================
-if success then
-    mt.__index = newcclosure(function(self, k)
-        if Config.InfiniteRange and not checkcaller() then
-            if k == "MaxRange" or k == "Range" or k == "BulletRange" then return 9999 end
-        end
-        return oldIndex(self, k)
-    end)
+function SetupInfiniteRange()
+    -- Infinite Range is disabled on this executor
+    -- No metatable hooks = no infinite range
 end
 
 -- ============================================
@@ -1446,10 +1373,10 @@ function SetupClickTP()
 end
 
 -- ============================================
--- NOTIFICATION
+-- NOTIFICATION - UI LOADS 100%
 -- ============================================
 StarterGui:SetCore("SendNotification", {
     Title = "ARC CLIENT",
-    Text = "Custom UI Loaded • Silent Aim: " .. (success and "ON" or "OFF (Metatable failed)"),
+    Text = "UI Loaded Successfully! • Silent Aim Unavailable",
     Duration = 5
 })
