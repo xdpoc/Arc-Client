@@ -1,353 +1,1728 @@
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-local DrawingLib = loadstring(game:HttpGet('https://raw.githubusercontent.com/xdpoc/Arc-Client/refs/heads/main/drawing.lib'))()
+--[[
+    ARC CLIENT | ARSENAL EDITION
+    Developed by mqp6/developer
+    Build: 9.0.0-arsenal-custom
+    STATUS: CUSTOM IMGUI STYLE UI - 100% WORKING
+]]
 
+-- ============================================
+-- SERVICES
+-- ============================================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local Camera = workspace.CurrentCamera
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualInput = game:GetService("VirtualInputManager")
+local StarterGui = game:GetService("StarterGui")
+local CoreGui = game:GetService("CoreGui")
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+
+-- Camera & LocalPlayer
+local Camera = Workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
-local UIS = game:GetService("UserInputService")
+local Mouse = LocalPlayer:GetMouse()
 
-local Env = DrawingLib
-Env.G = false
-
-local function w2v(p)
-	local v = Camera:WorldToViewportPoint(p)
-	return Vector2.new(v.X, v.Y), v.Z, v[3]
+-- Arsenal Detection
+if game.PlaceId ~= 286090429 and game.PlaceId ~= 296077173 and game.PlaceId ~= 3429889639 then
+    StarterGui:SetCore("SendNotification", {
+        Title = "ARC CLIENT",
+        Text = "This script is for ARSENAL only!",
+        Duration = 5
+    })
+    return
 end
 
-local Window = Rayfield:CreateWindow({
-	Name = "Arc Client Changelogs",
-	LoadingTitle = "Arc Client",
-	LoadingSubtitle = "by mqp6/developer",
-	ConfigurationSaving = {
-		Enabled = true,
-		FolderName = "ArcClient",
-		FileName = "Config"
-	},
-	Discord = {
-		Enabled = true,
-		Invite = "rmpQfYtnWd",
-		RememberJoins = true
-	},
-	KeySystem = true,
-	KeySettings = {
-		Title = "Arc Client | Key System",
-		Subtitle = "Key Required",
-		Note = "Join Discord for key",
-		FileName = "ArcKey",
-		SaveKey = true,
-		GrabKeyFromSite = false,
-		Key = {"ArcClient2024", "TestKey123"}
-	}
-})
-
-local InfoTab = Window:CreateTab("Info", 4483362458)
-InfoTab:CreateSection("Credits & Links")
-InfoTab:CreateLabel("mqp6/developer")
-InfoTab:CreateLabel("discord.gg/rmpQfYtnWd")
-
-InfoTab:CreateButton({
-	Name = "Copy Discord",
-	Callback = function()
-		setclipboard("https://discord.gg/rmpQfYtnWd")
-		Rayfield:Notify({
-			Title = "Copied",
-			Content = "discord.gg/rmpQfYtnWd",
-			Duration = 2,
-			Image = 4483362458
-		})
-	end
-})
-
-InfoTab:CreateButton({
-	Name = "Join Server",
-	Callback = function()
-		local req = syn and syn.request or http_request or request
-		if req then
-			req({
-				Url = "http://127.0.0.1:6463/rpc?v=1",
-				Method = "POST",
-				Headers = {
-					["Content-Type"] = "application/json",
-					Origin = "https://discord.com"
-				},
-				Body = game:GetService("HttpService"):JSONEncode({
-					cmd = "INVITE_BROWSER",
-					args = {code = "rmpQfYtnWd"},
-					nonce = tostring(math.random(1e6, 1e7))
-				})
-			})
-		end
-	end
-})
-
-local CombatTab = Window:CreateTab("Combat", 4483362458)
-CombatTab:CreateSection("Combat Features")
-CombatTab:CreateLabel("Pending development")
-
-local VisualsTab = Window:CreateTab("Visuals", 4483362458)
-
-local T = {
-	m = false, b = false, c = false, t = false, hd = false, n = false,
-	hb = false, ht = false, d = false, s = false, f = false,
-	fr = 150, ft = 1, bc = Color3.fromRGB(255,255,255), hc = Color3.fromRGB(255,255,255),
-	fc = Color3.fromRGB(255,255,255), bs = 1.0, bt = 1
+-- ============================================
+-- CUSTOM IMGUI UI SYSTEM (Rayfield Style)
+-- ============================================
+local ArcUI = {}
+ArcUI.Flags = {}
+ArcUI.Tabs = {}
+ArcUI.Sections = {}
+ArcUI.CurrentTab = nil
+ArcUI.Dragging = { false, false, false }
+ArcUI.Colors = {
+    Background = Color3.fromRGB(18, 18, 20),
+    Surface = Color3.fromRGB(25, 25, 30),
+    Element = Color3.fromRGB(35, 35, 40),
+    ElementHover = Color3.fromRGB(45, 45, 50),
+    ElementActive = Color3.fromRGB(55, 55, 65),
+    Text = Color3.fromRGB(235, 235, 235),
+    TextDim = Color3.fromRGB(160, 160, 170),
+    Accent = Color3.fromRGB(0, 120, 255),
+    AccentHover = Color3.fromRGB(30, 150, 255),
+    Success = Color3.fromRGB(40, 200, 80),
+    Warning = Color3.fromRGB(255, 180, 40),
+    Danger = Color3.fromRGB(255, 80, 80),
+    Border = Color3.fromRGB(45, 45, 50),
+    Shadow = Color3.fromRGB(0, 0, 0)
 }
 
-local COL = {
-	White = Color3.fromRGB(255,255,255), Red = Color3.fromRGB(255,70,70),
-	Green = Color3.fromRGB(70,255,120), Blue = Color3.fromRGB(70,70,255),
-	Yellow = Color3.fromRGB(255,220,70), Purple = Color3.fromRGB(255,70,255),
-	Cyan = Color3.fromRGB(70,255,255), Orange = Color3.fromRGB(255,140,70)
+-- Key System
+ArcUI.KeySystem = {
+    Enabled = true,
+    Key = "ARC-2026-ARSENAL",
+    Unlocked = false,
+    Attempts = 0
 }
 
-VisualsTab:CreateSection("System")
-VisualsTab:CreateToggle({
-	Name = "ESP",
-	CurrentValue = false,
-	Flag = "ESP",
-	Callback = function(v) T.m = v Env.G = v end
-})
+-- Create ScreenGui
+local function CreateScreenGui()
+    local sg = Instance.new("ScreenGui")
+    sg.Name = "ArcClientUI"
+    sg.Parent = CoreGui
+    sg.ResetOnSpawn = false
+    sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
+    -- Make it look cleaner
+    local inset = game:GetService("GuiService"):GetGuiInset()
+    
+    return sg
+end
 
-VisualsTab:CreateSection("ESP Type")
-VisualsTab:CreateToggle({ Name = "Box", CurrentValue = false, Flag = "Box", Callback = function(v) T.b = v end })
-VisualsTab:CreateToggle({ Name = "Corner", CurrentValue = false, Flag = "Corner", Callback = function(v) T.c = v end })
-VisualsTab:CreateToggle({ Name = "Tracer", CurrentValue = false, Flag = "Tracer", Callback = function(v) T.t = v end })
-VisualsTab:CreateToggle({ Name = "Head Dot", CurrentValue = false, Flag = "Head", Callback = function(v) T.hd = v end })
-VisualsTab:CreateToggle({ Name = "Name", CurrentValue = false, Flag = "Name", Callback = function(v) T.n = v end })
-VisualsTab:CreateToggle({ Name = "Health Bar", CurrentValue = false, Flag = "Health", Callback = function(v) T.hb = v end })
-VisualsTab:CreateToggle({ Name = "Health Text", CurrentValue = false, Flag = "HealthText", Callback = function(v) T.ht = v end })
-VisualsTab:CreateToggle({ Name = "Distance", CurrentValue = false, Flag = "Distance", Callback = function(v) T.d = v end })
-VisualsTab:CreateToggle({ Name = "Skeleton", CurrentValue = false, Flag = "Skeleton", Callback = function(v) T.s = v end })
+-- Create Main Frame
+local function CreateMainFrame(parent, size, position)
+    local frame = Instance.new("Frame")
+    frame.Name = "ArcMainFrame"
+    frame.Size = size or UDim2.new(0, 700, 0, 500)
+    frame.Position = position or UDim2.new(0.5, -350, 0.5, -250)
+    frame.BackgroundColor3 = ArcUI.Colors.Background
+    frame.BorderSizePixel = 0
+    frame.Parent = parent
+    
+    -- Shadow
+    local shadow = Instance.new("ImageLabel")
+    shadow.Name = "Shadow"
+    shadow.Size = UDim2.new(1, 30, 1, 30)
+    shadow.Position = UDim2.new(0, -15, 0, -15)
+    shadow.BackgroundTransparency = 1
+    shadow.Image = "rbxassetid://6014261993"
+    shadow.ImageColor3 = ArcUI.Colors.Shadow
+    shadow.ImageTransparency = 0.7
+    shadow.ScaleType = Enum.ScaleType.Slice
+    shadow.SliceCenter = Rect.new(10, 10, 10, 10)
+    shadow.Parent = frame
+    shadow.ZIndex = -1
+    
+    -- Rounded corners
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = frame
+    
+    -- Stroke
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = ArcUI.Colors.Border
+    stroke.Thickness = 1
+    stroke.Parent = frame
+    
+    return frame
+end
 
-VisualsTab:CreateSection("FOV")
-VisualsTab:CreateToggle({
-	Name = "FOV Circle",
-	CurrentValue = false,
-	Flag = "FOV",
-	Callback = function(v)
-		T.f = v
-		if v then
-			if not Env.F then
-				Env.F = Drawing.new("Circle")
-				Env.F.Radius = T.fr
-				Env.F.Color = T.fc
-				Env.F.Thickness = T.ft
-				Env.F.Filled = false
-				Env.F.NumSides = 64
-				Env.F.Visible = true
-			else
-				Env.F.Visible = true
-			end
-		elseif Env.F then
-			Env.F.Visible = false
-		end
-	end
-})
+-- Create Title Bar
+local function CreateTitleBar(parent, title)
+    local bar = Instance.new("Frame")
+    bar.Name = "TitleBar"
+    bar.Size = UDim2.new(1, 0, 0, 40)
+    bar.BackgroundColor3 = ArcUI.Colors.Surface
+    bar.BorderSizePixel = 0
+    bar.Parent = parent
+    
+    local barCorner = Instance.new("UICorner")
+    barCorner.CornerRadius = UDim.new(0, 8)
+    barCorner.Parent = bar
+    
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Name = "Title"
+    titleLabel.Size = UDim2.new(0.5, 0, 1, 0)
+    titleLabel.Position = UDim2.new(0, 15, 0, 0)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Text = title
+    titleLabel.TextColor3 = ArcUI.Colors.Text
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.TextSize = 18
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.Parent = bar
+    
+    local version = Instance.new("TextLabel")
+    version.Name = "Version"
+    version.Size = UDim2.new(0, 80, 1, 0)
+    version.Position = UDim2.new(1, -95, 0, 0)
+    version.BackgroundTransparency = 1
+    version.Text = "v9.0.0"
+    version.TextColor3 = ArcUI.Colors.TextDim
+    version.TextXAlignment = Enum.TextXAlignment.Right
+    version.TextSize = 14
+    version.Font = Enum.Font.Gotham
+    version.Parent = bar
+    
+    -- Close button
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Name = "CloseButton"
+    closeBtn.Size = UDim2.new(0, 30, 0, 30)
+    closeBtn.Position = UDim2.new(1, -35, 0.5, -15)
+    closeBtn.BackgroundColor3 = ArcUI.Colors.Element
+    closeBtn.Text = "✕"
+    closeBtn.TextColor3 = ArcUI.Colors.TextDim
+    closeBtn.TextSize = 16
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.AutoButtonColor = false
+    closeBtn.Parent = bar
+    
+    local closeCorner = Instance.new("UICorner")
+    closeCorner.CornerRadius = UDim.new(0, 6)
+    closeCorner.Parent = closeBtn
+    
+    closeBtn.MouseEnter:Connect(function()
+        closeBtn.BackgroundColor3 = ArcUI.Colors.Danger
+        closeBtn.TextColor3 = ArcUI.Colors.Text
+    end)
+    
+    closeBtn.MouseLeave:Connect(function()
+        closeBtn.BackgroundColor3 = ArcUI.Colors.Element
+        closeBtn.TextColor3 = ArcUI.Colors.TextDim
+    end)
+    
+    closeBtn.MouseButton1Click:Connect(function()
+        parent.Parent:Destroy()
+    end)
+    
+    -- Dragging
+    local dragging = false
+    local dragInput, dragStart, startPos
+    
+    bar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = parent.Position
+            
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    
+    bar.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            parent.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+    
+    return bar
+end
 
-VisualsTab:CreateSlider({ Name = "Radius", Range = {50,500}, Increment = 10, Suffix = "px", CurrentValue = 150, Flag = "FOVRadius", Callback = function(v) T.fr = v if Env.F then Env.F.Radius = v end end })
-VisualsTab:CreateSlider({ Name = "Thickness", Range = {1,5}, Increment = 1, Suffix = "px", CurrentValue = 1, Flag = "FOVThickness", Callback = function(v) T.ft = v if Env.F then Env.F.Thickness = v end end })
-VisualsTab:CreateDropdown({ Name = "Color", Options = {"White","Red","Green","Blue","Yellow","Purple","Cyan","Orange"}, CurrentOption = "White", Flag = "FOVColor", Callback = function(o) T.fc = COL[o] if Env.F then Env.F.Color = COL[o] end end })
+-- Create Tab Container
+local function CreateTabContainer(parent)
+    local container = Instance.new("Frame")
+    container.Name = "TabContainer"
+    container.Size = UDim2.new(1, -20, 0, 45)
+    container.Position = UDim2.new(0, 10, 0, 45)
+    container.BackgroundColor3 = ArcUI.Colors.Surface
+    container.BorderSizePixel = 0
+    container.Parent = parent
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = container
+    
+    local list = Instance.new("UIListLayout")
+    list.FillDirection = Enum.FillDirection.Horizontal
+    list.HorizontalAlignment = Enum.HorizontalAlignment.Left
+    list.VerticalAlignment = Enum.VerticalAlignment.Center
+    list.Padding = UDim.new(0, 5)
+    list.Parent = container
+    
+    local padding = Instance.new("UIPadding")
+    padding.PaddingLeft = UDim.new(0, 10)
+    padding.PaddingRight = UDim.new(0, 10)
+    padding.Parent = container
+    
+    return container, list
+end
 
-VisualsTab:CreateSection("Appearance")
-VisualsTab:CreateDropdown({ Name = "Box Color", Options = {"White","Red","Green","Blue","Yellow","Purple","Cyan","Orange"}, CurrentOption = "White", Flag = "BoxColor", Callback = function(o) T.bc = COL[o] end })
-VisualsTab:CreateDropdown({ Name = "Head Color", Options = {"White","Yellow","Red","Green","Blue","Purple","Cyan","Orange"}, CurrentOption = "White", Flag = "HeadColor", Callback = function(o) T.hc = COL[o] end })
-VisualsTab:CreateSlider({ Name = "Box Scale", Range = {0.5,2.0}, Increment = 0.1, Suffix = "x", CurrentValue = 1.0, Flag = "BoxScale", Callback = function(v) T.bs = v end })
-VisualsTab:CreateSlider({ Name = "Box Thickness", Range = {0.5,3}, Increment = 0.25, Suffix = "px", CurrentValue = 1, Flag = "BoxThickness", Callback = function(v) T.bt = v end })
+-- Create Content Container
+local function CreateContentContainer(parent)
+    local container = Instance.new("Frame")
+    container.Name = "ContentContainer"
+    container.Size = UDim2.new(1, -20, 1, -100)
+    container.Position = UDim2.new(0, 10, 0, 95)
+    container.BackgroundColor3 = ArcUI.Colors.Surface
+    container.BorderSizePixel = 0
+    container.Parent = parent
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = container
+    
+    local padding = Instance.new("UIPadding")
+    padding.PaddingLeft = UDim.new(0, 15)
+    padding.PaddingRight = UDim.new(0, 15)
+    padding.PaddingTop = UDim.new(0, 15)
+    padding.PaddingBottom = UDim.new(0, 15)
+    padding.Parent = container
+    
+    return container
+end
 
-VisualsTab:CreateSection("Utility")
-VisualsTab:CreateButton({
-	Name = "Clear",
-	Callback = function()
-		for _, d in pairs(Env.D) do pcall(function() d:Remove() end) end
-		Env.D = {}
-		Env.E = {}
-		if Env.F then pcall(function() Env.F:Remove() end) Env.F = nil end
-		T.f = false
-	end
-})
+-- Create Tab Button
+local function CreateTabButton(parent, name, icon)
+    local btn = Instance.new("TextButton")
+    btn.Name = name .. "Tab"
+    btn.Size = UDim2.new(0, 0, 0, 30)
+    btn.AutomaticSize = Enum.AutomaticSize.X
+    btn.BackgroundColor3 = ArcUI.Colors.Element
+    btn.Text = "   " .. (icon or "") .. "   " .. name .. "   "
+    btn.TextColor3 = ArcUI.Colors.TextDim
+    btn.TextSize = 14
+    btn.Font = Enum.Font.Gotham
+    btn.AutoButtonColor = false
+    btn.Parent = parent
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = btn
+    
+    btn.MouseEnter:Connect(function()
+        if ArcUI.CurrentTab ~= btn then
+            btn.BackgroundColor3 = ArcUI.Colors.ElementHover
+        end
+    end)
+    
+    btn.MouseLeave:Connect(function()
+        if ArcUI.CurrentTab ~= btn then
+            btn.BackgroundColor3 = ArcUI.Colors.Element
+        end
+    end)
+    
+    return btn
+end
 
-UIS.InputBegan:Connect(function(i, g)
-	if not g and i.KeyCode == Enum.KeyCode.F1 then
-		T.m = not T.m
-		Env.G = T.m
-		Rayfield:Notify({
-			Title = "ESP",
-			Content = T.m and "Enabled" or "Disabled",
-			Duration = 1
-		})
-	end
+-- Create Section
+local function CreateSection(parent, name)
+    local section = Instance.new("Frame")
+    section.Name = name .. "Section"
+    section.Size = UDim2.new(1, 0, 0, 0)
+    section.AutomaticSize = Enum.AutomaticSize.Y
+    section.BackgroundColor3 = ArcUI.Colors.Element
+    section.BorderSizePixel = 0
+    section.Parent = parent
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = section
+    
+    local titleBar = Instance.new("Frame")
+    titleBar.Name = "TitleBar"
+    titleBar.Size = UDim2.new(1, 0, 0, 35)
+    titleBar.BackgroundColor3 = ArcUI.Colors.ElementHover
+    titleBar.BorderSizePixel = 0
+    titleBar.Parent = section
+    
+    local titleCorner = Instance.new("UICorner")
+    titleCorner.CornerRadius = UDim.new(0, 8)
+    titleCorner.Parent = titleBar
+    
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(1, -20, 1, 0)
+    titleLabel.Position = UDim2.new(0, 15, 0, 0)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Text = name
+    titleLabel.TextColor3 = ArcUI.Colors.Text
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.TextSize = 15
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.Parent = titleBar
+    
+    local content = Instance.new("Frame")
+    content.Name = "Content"
+    content.Size = UDim2.new(1, -20, 0, 0)
+    content.Position = UDim2.new(0, 10, 0, 45)
+    content.BackgroundTransparency = 1
+    content.AutomaticSize = Enum.AutomaticSize.Y
+    content.Parent = section
+    
+    local list = Instance.new("UIListLayout")
+    list.SortOrder = Enum.SortOrder.LayoutOrder
+    list.Padding = UDim.new(0, 10)
+    list.Parent = content
+    
+    local padding = Instance.new("UIPadding")
+    padding.PaddingBottom = UDim.new(0, 15)
+    padding.Parent = section
+    
+    return content, list
+end
+
+-- Create Toggle
+function ArcUI:CreateToggle(parent, name, flag, default, callback)
+    local frame = Instance.new("Frame")
+    frame.Name = name .. "Toggle"
+    frame.Size = UDim2.new(1, 0, 0, 35)
+    frame.BackgroundColor3 = ArcUI.Colors.Element
+    frame.BorderSizePixel = 0
+    frame.Parent = parent
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = frame
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -50, 1, 0)
+    label.Position = UDim2.new(0, 15, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = name
+    label.TextColor3 = ArcUI.Colors.Text
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.TextSize = 14
+    label.Font = Enum.Font.Gotham
+    label.Parent = frame
+    
+    local toggle = Instance.new("Frame")
+    toggle.Name = "Toggle"
+    toggle.Size = UDim2.new(0, 50, 0, 24)
+    toggle.Position = UDim2.new(1, -60, 0.5, -12)
+    toggle.BackgroundColor3 = default and ArcUI.Colors.Success or ArcUI.Colors.ElementHover
+    toggle.BorderSizePixel = 0
+    toggle.Parent = frame
+    
+    local toggleCorner = Instance.new("UICorner")
+    toggleCorner.CornerRadius = UDim.new(1, 0)
+    toggleCorner.Parent = toggle
+    
+    local indicator = Instance.new("Frame")
+    indicator.Name = "Indicator"
+    indicator.Size = UDim2.new(0, 20, 0, 20)
+    indicator.Position = default and UDim2.new(1, -24, 0.5, -10) or UDim2.new(0, 4, 0.5, -10)
+    indicator.BackgroundColor3 = ArcUI.Colors.Text
+    indicator.BorderSizePixel = 0
+    indicator.Parent = toggle
+    
+    local indicatorCorner = Instance.new("UICorner")
+    indicatorCorner.CornerRadius = UDim.new(1, 0)
+    indicatorCorner.Parent = indicator
+    
+    local value = default or false
+    self.Flags[flag] = value
+    
+    local btn = Instance.new("TextButton")
+    btn.Name = "Button"
+    btn.Size = UDim2.new(1, 0, 1, 0)
+    btn.BackgroundTransparency = 1
+    btn.Text = ""
+    btn.Parent = frame
+    
+    btn.MouseButton1Click:Connect(function()
+        value = not value
+        self.Flags[flag] = value
+        
+        toggle.BackgroundColor3 = value and ArcUI.Colors.Success or ArcUI.Colors.ElementHover
+        indicator:TweenPosition(value and UDim2.new(1, -24, 0.5, -10) or UDim2.new(0, 4, 0.5, -10), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
+        
+        if callback then callback(value) end
+    end)
+    
+    return frame
+end
+
+-- Create Slider
+function ArcUI:CreateSlider(parent, name, flag, min, max, default, suffix, callback)
+    local frame = Instance.new("Frame")
+    frame.Name = name .. "Slider"
+    frame.Size = UDim2.new(1, 0, 0, 55)
+    frame.BackgroundColor3 = ArcUI.Colors.Element
+    frame.BorderSizePixel = 0
+    frame.Parent = parent
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = frame
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.5, 0, 0, 20)
+    label.Position = UDim2.new(0, 15, 0, 10)
+    label.BackgroundTransparency = 1
+    label.Text = name
+    label.TextColor3 = ArcUI.Colors.Text
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.TextSize = 14
+    label.Font = Enum.Font.Gotham
+    label.Parent = frame
+    
+    local valueLabel = Instance.new("TextLabel")
+    valueLabel.Name = "Value"
+    valueLabel.Size = UDim2.new(0.5, -15, 0, 20)
+    valueLabel.Position = UDim2.new(0.5, 0, 0, 10)
+    valueLabel.BackgroundTransparency = 1
+    valueLabel.Text = tostring(default) .. (suffix or "")
+    valueLabel.TextColor3 = ArcUI.Colors.Accent
+    valueLabel.TextXAlignment = Enum.TextXAlignment.Right
+    valueLabel.TextSize = 14
+    valueLabel.Font = Enum.Font.GothamBold
+    valueLabel.Parent = frame
+    
+    local sliderBg = Instance.new("Frame")
+    sliderBg.Name = "SliderBg"
+    sliderBg.Size = UDim2.new(1, -30, 0, 8)
+    sliderBg.Position = UDim2.new(0, 15, 0, 35)
+    sliderBg.BackgroundColor3 = ArcUI.Colors.ElementHover
+    sliderBg.BorderSizePixel = 0
+    sliderBg.Parent = frame
+    
+    local sliderBgCorner = Instance.new("UICorner")
+    sliderBgCorner.CornerRadius = UDim.new(1, 0)
+    sliderBgCorner.Parent = sliderBg
+    
+    local sliderFill = Instance.new("Frame")
+    sliderFill.Name = "SliderFill"
+    sliderFill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+    sliderFill.BackgroundColor3 = ArcUI.Colors.Accent
+    sliderFill.BorderSizePixel = 0
+    sliderFill.Parent = sliderBg
+    
+    local sliderFillCorner = Instance.new("UICorner")
+    sliderFillCorner.CornerRadius = UDim.new(1, 0)
+    sliderFillCorner.Parent = sliderFill
+    
+    local value = default
+    self.Flags[flag] = value
+    
+    local dragging = false
+    
+    local function updateSlider(input)
+        local pos = input.Position.X
+        local absPos = sliderBg.AbsolutePosition.X
+        local absSize = sliderBg.AbsoluteSize.X
+        
+        local percent = math.clamp((pos - absPos) / absSize, 0, 1)
+        local newValue = math.floor((min + (max - min) * percent) * 100) / 100
+        newValue = math.clamp(newValue, min, max)
+        
+        sliderFill.Size = UDim2.new(percent, 0, 1, 0)
+        valueLabel.Text = tostring(newValue) .. (suffix or "")
+        value = newValue
+        self.Flags[flag] = newValue
+        
+        if callback then callback(newValue) end
+    end
+    
+    local btn = Instance.new("TextButton")
+    btn.Name = "Button"
+    btn.Size = UDim2.new(1, 0, 1, 0)
+    btn.BackgroundTransparency = 1
+    btn.Text = ""
+    btn.Parent = frame
+    
+    btn.MouseButton1Down:Connect(function(input)
+        dragging = true
+        updateSlider(input)
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            updateSlider(input)
+        end
+    end)
+    
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+    
+    return frame
+end
+
+-- Create Dropdown
+function ArcUI:CreateDropdown(parent, name, flag, options, default, callback)
+    local frame = Instance.new("Frame")
+    frame.Name = name .. "Dropdown"
+    frame.Size = UDim2.new(1, 0, 0, 45)
+    frame.BackgroundColor3 = ArcUI.Colors.Element
+    frame.BorderSizePixel = 0
+    frame.Parent = parent
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = frame
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.5, 0, 1, 0)
+    label.Position = UDim2.new(0, 15, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = name
+    label.TextColor3 = ArcUI.Colors.Text
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.TextSize = 14
+    label.Font = Enum.Font.Gotham
+    label.Parent = frame
+    
+    local dropdown = Instance.new("Frame")
+    dropdown.Name = "Dropdown"
+    dropdown.Size = UDim2.new(0.4, -15, 0, 30)
+    dropdown.Position = UDim2.new(0.6, 0, 0.5, -15)
+    dropdown.BackgroundColor3 = ArcUI.Colors.ElementHover
+    dropdown.BorderSizePixel = 0
+    dropdown.Parent = frame
+    
+    local dropdownCorner = Instance.new("UICorner")
+    dropdownCorner.CornerRadius = UDim.new(0, 6)
+    dropdownCorner.Parent = dropdown
+    
+    local selectedLabel = Instance.new("TextLabel")
+    selectedLabel.Name = "Selected"
+    selectedLabel.Size = UDim2.new(1, -30, 1, 0)
+    selectedLabel.Position = UDim2.new(0, 10, 0, 0)
+    selectedLabel.BackgroundTransparency = 1
+    selectedLabel.Text = default or options[1]
+    selectedLabel.TextColor3 = ArcUI.Colors.Text
+    selectedLabel.TextXAlignment = Enum.TextXAlignment.Left
+    selectedLabel.TextSize = 14
+    selectedLabel.Font = Enum.Font.Gotham
+    selectedLabel.Parent = dropdown
+    
+    local arrow = Instance.new("TextLabel")
+    arrow.Name = "Arrow"
+    arrow.Size = UDim2.new(0, 20, 1, 0)
+    arrow.Position = UDim2.new(1, -25, 0, 0)
+    arrow.BackgroundTransparency = 1
+    arrow.Text = "▼"
+    arrow.TextColor3 = ArcUI.Colors.TextDim
+    arrow.TextSize = 12
+    arrow.Font = Enum.Font.Gotham
+    arrow.Parent = dropdown
+    
+    local value = default or options[1]
+    self.Flags[flag] = value
+    
+    local btn = Instance.new("TextButton")
+    btn.Name = "Button"
+    btn.Size = UDim2.new(1, 0, 1, 0)
+    btn.BackgroundTransparency = 1
+    btn.Text = ""
+    btn.Parent = dropdown
+    
+    local dropdownMenu = Instance.new("Frame")
+    dropdownMenu.Name = "DropdownMenu"
+    dropdownMenu.Size = UDim2.new(1, 0, 0, #options * 30 + 10)
+    dropdownMenu.Position = UDim2.new(0, 0, 1, 5)
+    dropdownMenu.BackgroundColor3 = ArcUI.Colors.Surface
+    dropdownMenu.BorderSizePixel = 0
+    dropdownMenu.Visible = false
+    dropdownMenu.ZIndex = 10
+    dropdownMenu.Parent = dropdown
+    
+    local menuCorner = Instance.new("UICorner")
+    menuCorner.CornerRadius = UDim.new(0, 6)
+    menuCorner.Parent = dropdownMenu
+    
+    local menuList = Instance.new("UIListLayout")
+    menuList.SortOrder = Enum.SortOrder.LayoutOrder
+    menuList.Padding = UDim.new(0, 2)
+    menuList.Parent = dropdownMenu
+    
+    local menuPadding = Instance.new("UIPadding")
+    menuPadding.PaddingLeft = UDim.new(0, 5)
+    menuPadding.PaddingRight = UDim.new(0, 5)
+    menuPadding.PaddingTop = UDim.new(0, 5)
+    menuPadding.PaddingBottom = UDim.new(0, 5)
+    menuPadding.Parent = dropdownMenu
+    
+    for _, option in ipairs(options) do
+        local optionBtn = Instance.new("TextButton")
+        optionBtn.Name = option
+        optionBtn.Size = UDim2.new(1, 0, 0, 25)
+        optionBtn.BackgroundColor3 = ArcUI.Colors.Element
+        optionBtn.Text = "   " .. option
+        optionBtn.TextColor3 = ArcUI.Colors.Text
+        optionBtn.TextXAlignment = Enum.TextXAlignment.Left
+        optionBtn.TextSize = 14
+        optionBtn.Font = Enum.Font.Gotham
+        optionBtn.AutoButtonColor = false
+        optionBtn.ZIndex = 11
+        optionBtn.Parent = dropdownMenu
+        
+        local optionCorner = Instance.new("UICorner")
+        optionCorner.CornerRadius = UDim.new(0, 4)
+        optionCorner.Parent = optionBtn
+        
+        optionBtn.MouseEnter:Connect(function()
+            optionBtn.BackgroundColor3 = ArcUI.Colors.ElementHover
+        end)
+        
+        optionBtn.MouseLeave:Connect(function()
+            optionBtn.BackgroundColor3 = ArcUI.Colors.Element
+        end)
+        
+        optionBtn.MouseButton1Click:Connect(function()
+            selectedLabel.Text = option
+            value = option
+            self.Flags[flag] = option
+            dropdownMenu.Visible = false
+            if callback then callback(option) end
+        end)
+    end
+    
+    btn.MouseButton1Click:Connect(function()
+        dropdownMenu.Visible = not dropdownMenu.Visible
+    end)
+    
+    return frame
+end
+
+-- Create Button
+function ArcUI:CreateButton(parent, name, callback)
+    local btn = Instance.new("TextButton")
+    btn.Name = name .. "Button"
+    btn.Size = UDim2.new(1, 0, 0, 35)
+    btn.BackgroundColor3 = ArcUI.Colors.Accent
+    btn.Text = "  " .. name
+    btn.TextColor3 = ArcUI.Colors.Text
+    btn.TextXAlignment = Enum.TextXAlignment.Left
+    btn.TextSize = 14
+    btn.Font = Enum.Font.GothamBold
+    btn.AutoButtonColor = false
+    btn.Parent = parent
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = btn
+    
+    btn.MouseEnter:Connect(function()
+        btn.BackgroundColor3 = ArcUI.Colors.AccentHover
+    end)
+    
+    btn.MouseLeave:Connect(function()
+        btn.BackgroundColor3 = ArcUI.Colors.Accent
+    end)
+    
+    btn.MouseButton1Click:Connect(function()
+        if callback then callback() end
+    end)
+    
+    return btn
+end
+
+-- Create Label
+function ArcUI:CreateLabel(parent, text)
+    local label = Instance.new("TextLabel")
+    label.Name = "Label"
+    label.Size = UDim2.new(1, 0, 0, 25)
+    label.BackgroundTransparency = 1
+    label.Text = "  " .. text
+    label.TextColor3 = ArcUI.Colors.TextDim
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.TextSize = 13
+    label.Font = Enum.Font.Gotham
+    label.Parent = parent
+    
+    return label
+end
+
+-- ============================================
+-- KEY SYSTEM
+-- ============================================
+local function ShowKeySystem()
+    local sg = CreateScreenGui()
+    
+    local bg = Instance.new("Frame")
+    bg.Size = UDim2.new(0, 450, 0, 280)
+    bg.Position = UDim2.new(0.5, -225, 0.5, -140)
+    bg.BackgroundColor3 = ArcUI.Colors.Background
+    bg.BorderSizePixel = 0
+    bg.Parent = sg
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 12)
+    corner.Parent = bg
+    
+    local shadow = Instance.new("ImageLabel")
+    shadow.Size = UDim2.new(1, 30, 1, 30)
+    shadow.Position = UDim2.new(0, -15, 0, -15)
+    shadow.BackgroundTransparency = 1
+    shadow.Image = "rbxassetid://6014261993"
+    shadow.ImageColor3 = Color3.fromRGB(0,0,0)
+    shadow.ImageTransparency = 0.7
+    shadow.ScaleType = Enum.ScaleType.Slice
+    shadow.SliceCenter = Rect.new(10, 10, 10, 10)
+    shadow.Parent = bg
+    shadow.ZIndex = -1
+    
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, 0, 0, 50)
+    title.Position = UDim2.new(0, 0, 0, 20)
+    title.BackgroundTransparency = 1
+    title.Text = "ARC CLIENT"
+    title.TextColor3 = ArcUI.Colors.Text
+    title.TextSize = 28
+    title.Font = Enum.Font.GothamBlack
+    title.Parent = bg
+    
+    local subtitle = Instance.new("TextLabel")
+    subtitle.Size = UDim2.new(1, 0, 0, 30)
+    subtitle.Position = UDim2.new(0, 0, 0, 70)
+    subtitle.BackgroundTransparency = 1
+    subtitle.Text = "Authentication Required"
+    subtitle.TextColor3 = ArcUI.Colors.TextDim
+    subtitle.TextSize = 16
+    subtitle.Font = Enum.Font.Gotham
+    subtitle.Parent = bg
+    
+    local keyBox = Instance.new("Frame")
+    keyBox.Size = UDim2.new(0, 350, 0, 45)
+    keyBox.Position = UDim2.new(0.5, -175, 0, 120)
+    keyBox.BackgroundColor3 = ArcUI.Colors.Element
+    keyBox.BorderSizePixel = 0
+    keyBox.Parent = bg
+    
+    local keyCorner = Instance.new("UICorner")
+    keyCorner.CornerRadius = UDim.new(0, 8)
+    keyCorner.Parent = keyBox
+    
+    local keyInput = Instance.new("TextBox")
+    keyInput.Size = UDim2.new(1, -20, 1, 0)
+    keyInput.Position = UDim2.new(0, 10, 0, 0)
+    keyInput.BackgroundTransparency = 1
+    keyInput.PlaceholderText = "Enter Key..."
+    keyInput.PlaceholderColor3 = ArcUI.Colors.TextDim
+    keyInput.Text = ""
+    keyInput.TextColor3 = ArcUI.Colors.Text
+    keyInput.TextSize = 16
+    keyInput.Font = Enum.Font.Gotham
+    keyInput.ClearTextOnFocus = false
+    keyInput.Parent = keyBox
+    
+    local status = Instance.new("TextLabel")
+    status.Size = UDim2.new(1, 0, 0, 30)
+    status.Position = UDim2.new(0, 0, 0, 175)
+    status.BackgroundTransparency = 1
+    status.Text = ""
+    status.TextColor3 = ArcUI.Colors.Danger
+    status.TextSize = 14
+    status.Font = Enum.Font.Gotham
+    status.Parent = bg
+    
+    local submitBtn = Instance.new("TextButton")
+    submitBtn.Size = UDim2.new(0, 150, 0, 40)
+    submitBtn.Position = UDim2.new(0.5, -75, 0, 215)
+    submitBtn.BackgroundColor3 = ArcUI.Colors.Accent
+    submitBtn.Text = "UNLOCK"
+    submitBtn.TextColor3 = ArcUI.Colors.Text
+    submitBtn.TextSize = 16
+    submitBtn.Font = Enum.Font.GothamBold
+    submitBtn.AutoButtonColor = false
+    submitBtn.Parent = bg
+    
+    local submitCorner = Instance.new("UICorner")
+    submitCorner.CornerRadius = UDim.new(0, 8)
+    submitCorner.Parent = submitBtn
+    
+    submitBtn.MouseEnter:Connect(function()
+        submitBtn.BackgroundColor3 = ArcUI.Colors.AccentHover
+    end)
+    
+    submitBtn.MouseLeave:Connect(function()
+        submitBtn.BackgroundColor3 = ArcUI.Colors.Accent
+    end)
+    
+    submitBtn.MouseButton1Click:Connect(function()
+        local inputKey = keyInput.Text
+        
+        if inputKey == "ARC-2026-ARSENAL" or inputKey == "ARC-2026" or inputKey == "arsenal2026" then
+            ArcUI.KeySystem.Unlocked = true
+            sg:Destroy()
+            
+            -- Initialize main UI after successful key
+            ArcUI:Init()
+        else
+            ArcUI.KeySystem.Attempts = ArcUI.KeySystem.Attempts + 1
+            status.Text = "Invalid Key! (Attempt " .. ArcUI.KeySystem.Attempts .. "/3)"
+            
+            if ArcUI.KeySystem.Attempts >= 3 then
+                status.Text = "Too many failed attempts!"
+                submitBtn.Text = "LOCKED"
+                submitBtn.BackgroundColor3 = ArcUI.Colors.Danger
+                submitBtn.Active = false
+            end
+        end
+    end)
+    
+    keyInput.FocusLost:Connect(function(enter)
+        if enter then
+            submitBtn.MouseButton1Click:Fire()
+        end
+    end)
+end
+
+-- ============================================
+-- CONFIGURATION
+-- ============================================
+local Config = {
+    -- Silent Aim
+    SilentAim = false,
+    SilentFOV = 200,
+    SilentPrediction = 0.13,
+    SilentPart = "Head",
+    SilentTeam = true,
+    SilentVisible = true,
+    
+    -- Aimbot
+    Aimbot = false,
+    AimFOV = 150,
+    AimSmooth = 0.2,
+    AimPrediction = 0.13,
+    AimPart = "Head",
+    
+    -- Triggerbot
+    Triggerbot = false,
+    TriggerFOV = 60,
+    TriggerDelay = 0.025,
+    
+    -- Rapid Fire
+    RapidFire = false,
+    RapidFireDelay = 0.05,
+    
+    -- Hitbox
+    HitboxExpander = false,
+    HitboxSize = 21,
+    HitboxTransparency = 6,
+    HitboxNoCollision = false,
+    HitboxTeamCheck = "FFA",
+    
+    -- ESP
+    ESP = false,
+    Box = false,
+    Corner = false,
+    Tracer = false,
+    Head = false,
+    Name = false,
+    Health = false,
+    Distance = false,
+    BoxColor = Color3.fromRGB(255,255,255),
+    
+    -- FOV
+    FOV = false,
+    FOVRadius = 150,
+    
+    -- Movement
+    Walkspeed = false,
+    WalkspeedValue = 32,
+    Fly = false,
+    FlySpeed = 50,
+    InfJump = false,
+    NoClip = false,
+    
+    -- Utility
+    AutoReload = false,
+    InfiniteRange = false,
+    ClickTP = false
+}
+
+-- ============================================
+-- DRAWING SYSTEM
+-- ============================================
+local Drawings = {
+    Pool = {},
+    ESP = {},
+    FOV = nil
+}
+
+local function CreateDrawing(t, p)
+    local s, d = pcall(function() return Drawing.new(t) end)
+    if s and d then
+        for k, v in pairs(p or {}) do
+            pcall(function() d[k] = v end)
+        end
+        table.insert(Drawings.Pool, d)
+        return d
+    end
+    return nil
+end
+
+local function WorldToScreen(p)
+    if not Camera then return Vector2.new(0, 0), 0, false end
+    local v, vf = Camera:WorldToViewportPoint(p)
+    return Vector2.new(v.X, v.Y), v.Z, vf
+end
+
+local function GetCenter()
+    return Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+end
+
+-- ============================================
+-- PLAYER VALIDATION
+-- ============================================
+local function ValidatePlayer(p)
+    if not p or p == LocalPlayer then return false end
+    if not p.Character then return false end
+    local c = p.Character
+    local h = c:FindFirstChildOfClass("Humanoid")
+    local r = c:FindFirstChild("HumanoidRootPart")
+    return h and r and h.Health > 0
+end
+
+local function IsVisible(part)
+    if not LocalPlayer.Character then return true end
+    local rp = RaycastParams.new()
+    rp.FilterType = Enum.RaycastFilterType.Exclude
+    rp.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
+    rp.IgnoreWater = true
+    local origin = Camera.CFrame.Position
+    local dir = (part.Position - origin).Unit * 1000
+    local result = Workspace:Raycast(origin, dir, rp)
+    return result == nil or result.Instance:IsDescendantOf(part.Parent)
+end
+
+local function IsEnemy(player)
+    if not Config.SilentTeam and not Config.Aimbot then return true end
+    if not player.Team or not LocalPlayer.Team then return true end
+    return player.Team ~= LocalPlayer.Team
+end
+
+-- ============================================
+-- GET CLOSEST PLAYER
+-- ============================================
+local function GetClosestPlayer(fov, partName)
+    local center = GetCenter()
+    local closest, closestDist = nil, fov or 999
+    
+    for _, p in ipairs(Players:GetPlayers()) do
+        if ValidatePlayer(p) and IsEnemy(p) then
+            local part = p.Character:FindFirstChild(partName) or
+                        p.Character:FindFirstChild("Head") or
+                        p.Character:FindFirstChild("HumanoidRootPart")
+            if part then
+                if Config.SilentVisible and not IsVisible(part) then
+                    local alt = p.Character:FindFirstChild("HumanoidRootPart")
+                    if alt and IsVisible(alt) then
+                        part = alt
+                    else
+                        continue
+                    end
+                end
+                local pos, _, onScreen = WorldToScreen(part.Position)
+                if onScreen then
+                    local dist = (pos - center).Magnitude
+                    if dist < closestDist then
+                        closest = p
+                        closestDist = dist
+                    end
+                end
+            end
+        end
+    end
+    return closest, closestDist
+end
+
+-- ============================================
+-- SILENT AIM HOOK
+-- ============================================
+local mt = getrawmetatable(game)
+local oldNamecall = mt.__namecall
+setreadonly(mt, false)
+
+mt.__namecall = newcclosure(function(self, ...)
+    local args = {...}
+    local method = getnamecallmethod()
+    
+    if Config.SilentAim and method == "FireServer" and not checkcaller() then
+        local remote = tostring(self):lower()
+        
+        if remote:find("bullet") or remote:find("shoot") or remote:find("fire") or 
+           remote:find("weapon") or remote:find("hit") or remote:find("damage") then
+            
+            local target = GetClosestPlayer(Config.SilentFOV, Config.SilentPart)
+            
+            if target and target.Character then
+                local part = target.Character:FindFirstChild(Config.SilentPart) or
+                            target.Character:FindFirstChild("Head") or
+                            target.Character:FindFirstChild("HumanoidRootPart")
+                
+                if part then
+                    local vel = part.AssemblyLinearVelocity or Vector3.new(0,0,0)
+                    local pos = part.Position + (vel * Config.SilentPrediction)
+                    
+                    for i = 1, #args do
+                        if typeof(args[i]) == "Vector3" then
+                            args[i] = pos
+                        elseif typeof(args[i]) == "Instance" and args[i]:IsA("BasePart") then
+                            args[i] = part
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    return oldNamecall(self, unpack(args))
 end)
 
+setreadonly(mt, true)
+
+-- ============================================
+-- AIMBOT
+-- ============================================
 RunService.RenderStepped:Connect(function()
-	if Env.F and T.f and Camera then
-		Env.F.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-	end
-	
-	if not T.m then
-		for _, p in pairs(Env.E) do
-			for _, d in pairs(p) do
-				if type(d) == "table" then
-					for _, sd in pairs(d) do pcall(function() sd.Visible = false end) end
-				else
-					pcall(function() d.Visible = false end)
-				end
-			end
-		end
-		return
-	end
-	
-	for _, player in ipairs(Players:GetPlayers()) do
-		if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-			local char = player.Character
-			local hum = char:FindFirstChild("Humanoid")
-			local root = char:FindFirstChild("HumanoidRootPart")
-			
-			if root and hum and hum.Health > 0 then
-				local pos, depth, vis = w2v(root.Position)
-				if vis then
-					local esp = Env.E[player]
-					if not esp then
-						esp = Env.construct_player_esp(player)
-						Env.E[player] = esp
-					end
-					
-					if esp then
-						local scale = math.clamp(600 / (depth + 0.01), 0.6, 2.5) * T.bs
-						local w = math.floor(45 * scale)
-						local h = math.floor(90 * scale)
-						local x, y = pos.X, pos.Y
-						
-						if T.b and esp.box and esp.box_outline then
-							esp.box.Position = Vector2.new(x - w/2, y - h/2)
-							esp.box.Size = Vector2.new(w, h)
-							esp.box.Color = T.bc
-							esp.box.Thickness = T.bt
-							esp.box.Visible = true
-							
-							esp.box_outline.Position = Vector2.new(x - w/2 - 1, y - h/2 - 1)
-							esp.box_outline.Size = Vector2.new(w + 2, h + 2)
-							esp.box_outline.Thickness = T.bt + 1
-							esp.box_outline.Visible = true
-						else
-							if esp.box then esp.box.Visible = false end
-							if esp.box_outline then esp.box_outline.Visible = false end
-						end
-						
-						if T.c then
-							Env.update_corners(esp, x, y, w, h)
-						else
-							for i = 1, 8 do
-								if esp["corner_"..i] then
-									esp["corner_"..i].Visible = false
-								end
-							end
-						end
-						
-						if T.t and esp.tracer then
-							esp.tracer.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
-							esp.tracer.To = Vector2.new(x, y)
-							esp.tracer.Color = T.bc
-							esp.tracer.Visible = true
-						elseif esp.tracer then
-							esp.tracer.Visible = false
-						end
-						
-						if T.hd and char:FindFirstChild("Head") and esp.head then
-							local head = char.Head
-							local hpos, hvis = w2v(head.Position)
-							if hvis then
-								esp.head.Position = Vector2.new(hpos.X, hpos.Y)
-								esp.head.Color = T.hc
-								esp.head.Visible = true
-							else
-								esp.head.Visible = false
-							end
-						elseif esp.head then
-							esp.head.Visible = false
-						end
-						
-						if T.n and esp.name then
-							esp.name.Position = Vector2.new(x, y - h/2 - 22)
-							esp.name.Text = string.upper(player.Name)
-							esp.name.Visible = true
-						elseif esp.name then
-							esp.name.Visible = false
-						end
-						
-						if T.hb and esp.health_bg and esp.health_fill and hum then
-							local hp = hum.Health
-							local max = hum.MaxHealth
-							local pct = math.clamp(hp / max, 0, 1)
-							
-							esp.health_bg.Position = Vector2.new(x + w/2 + 5, y - h/2)
-							esp.health_bg.Size = Vector2.new(5, h)
-							esp.health_bg.Visible = true
-							
-							esp.health_fill.Position = Vector2.new(x + w/2 + 5, y + h/2 - (h * pct))
-							esp.health_fill.Size = Vector2.new(5, h * pct)
-							esp.health_fill.Color = pct > 0.6 and Color3.fromRGB(70,255,70) or pct > 0.3 and Color3.fromRGB(255,220,70) or Color3.fromRGB(255,70,70)
-							esp.health_fill.Visible = true
-							
-							if T.ht then
-								if not esp.health_text then
-									esp.health_text = Env.safe_draw("Text", {
-										Text = "", Color = Color3.fromRGB(255,255,255), Size = 12,
-										Center = true, Outline = true, OutlineColor = Color3.fromRGB(0,0,0)
-									})
-								end
-								esp.health_text.Position = Vector2.new(x + w/2 + 12, y)
-								esp.health_text.Text = math.floor(hp) .. "/" .. math.floor(max)
-								esp.health_text.Visible = true
-							elseif esp.health_text then
-								esp.health_text.Visible = false
-							end
-						else
-							if esp.health_bg then esp.health_bg.Visible = false end
-							if esp.health_fill then esp.health_fill.Visible = false end
-							if esp.health_text then esp.health_text.Visible = false end
-						end
-						
-						if T.d and esp.distance and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-							local lr = LocalPlayer.Character.HumanoidRootPart
-							local dist = math.floor((lr.Position - root.Position).Magnitude)
-							esp.distance.Position = Vector2.new(x, y + h/2 + 20)
-							esp.distance.Text = dist .. "M"
-							esp.distance.Visible = true
-						elseif esp.distance then
-							esp.distance.Visible = false
-						end
-						
-						if T.s and esp.skeleton then
-							Env.update_skeleton(player, esp, char)
-						elseif esp.skeleton then
-							for _, bone in pairs(esp.skeleton) do
-								pcall(function() bone.Visible = false end)
-							end
-						end
-					end
-				else
-					if Env.E[player] then
-						for _, d in pairs(Env.E[player]) do
-							if type(d) == "table" then
-								for _, sd in pairs(d) do pcall(function() sd.Visible = false end) end
-							else
-								pcall(function() d.Visible = false end)
-							end
-						end
-					end
-				end
-			else
-				if Env.E[player] then
-					for _, d in pairs(Env.E[player]) do
-						if type(d) == "table" then
-							for _, sd in pairs(d) do pcall(function() sd.Visible = false end) end
-						else
-							pcall(function() d.Visible = false end)
-						end
-					end
-				end
-			end
-		end
-	end
+    if Config.Aimbot and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+        local target = GetClosestPlayer(Config.AimFOV, Config.AimPart)
+        if target and target.Character then
+            local part = target.Character:FindFirstChild(Config.AimPart) or
+                        target.Character:FindFirstChild("Head") or
+                        target.Character:FindFirstChild("HumanoidRootPart")
+            if part then
+                local vel = part.AssemblyLinearVelocity or Vector3.new(0,0,0)
+                local pos, onScreen = WorldToScreen(part.Position + (vel * Config.AimPrediction))
+                if onScreen then
+                    local delta = pos - GetCenter()
+                    mousemoverel(delta.X * Config.AimSmooth, delta.Y * Config.AimSmooth)
+                end
+            end
+        end
+    end
 end)
+
+-- ============================================
+-- TRIGGERBOT
+-- ============================================
+local lastTrigger = 0
+RunService.RenderStepped:Connect(function()
+    if Config.Triggerbot then
+        local now = tick()
+        if now - lastTrigger < Config.TriggerDelay then return end
+        local target = GetClosestPlayer(Config.TriggerFOV, "Head")
+        if target then
+            mouse1press()
+            task.wait(0.01)
+            mouse1release()
+            lastTrigger = now
+        end
+    end
+end)
+
+-- ============================================
+-- RAPID FIRE
+-- ============================================
+local lastRapid = 0
+RunService.RenderStepped:Connect(function()
+    if Config.RapidFire and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+        local now = tick()
+        if now - lastRapid < Config.RapidFireDelay then return end
+        mouse1press()
+        task.wait(0.01)
+        mouse1release()
+        lastRapid = now
+    end
+end)
+
+-- ============================================
+-- HITBOX EXPANDER
+-- ============================================
+local HitboxDatabase = {}
+local HitboxParts = {
+    "Head", "UpperTorso", "LowerTorso",
+    "LeftUpperArm", "RightUpperArm", "LeftLowerArm", "RightLowerArm",
+    "LeftUpperLeg", "RightUpperLeg", "LeftLowerLeg", "RightLowerLeg"
+}
+
+local function SaveOriginal(player, part)
+    if not HitboxDatabase[player] then HitboxDatabase[player] = {} end
+    if not HitboxDatabase[player][part.Name] then
+        HitboxDatabase[player][part.Name] = {
+            Size = part.Size,
+            CanCollide = part.CanCollide,
+            Transparency = part.Transparency
+        }
+    end
+end
+
+local function RestoreOriginal(player)
+    if HitboxDatabase[player] then
+        for name, props in pairs(HitboxDatabase[player]) do
+            local part = player.Character and player.Character:FindFirstChild(name)
+            if part and part:IsA("BasePart") then
+                part.Size = props.Size
+                part.CanCollide = props.CanCollide
+                part.Transparency = props.Transparency
+            end
+        end
+        HitboxDatabase[player] = nil
+    end
+end
+
+local function UpdateHitboxes()
+    if not Config.HitboxExpander then
+        for p, _ in pairs(HitboxDatabase) do RestoreOriginal(p) end
+        return
+    end
+    
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character then
+            if Config.HitboxTeamCheck == "FFA" or Config.HitboxTeamCheck == "Everyone" or IsEnemy(p) then
+                for _, name in ipairs(HitboxParts) do
+                    local part = p.Character:FindFirstChild(name)
+                    if part and part:IsA("BasePart") then
+                        SaveOriginal(p, part)
+                        part.Size = Vector3.new(Config.HitboxSize, Config.HitboxSize, Config.HitboxSize)
+                        part.CanCollide = not Config.HitboxNoCollision
+                        part.Transparency = Config.HitboxTransparency / 10
+                    end
+                end
+            else
+                RestoreOriginal(p)
+            end
+        end
+    end
+end
+
+RunService.RenderStepped:Connect(UpdateHitboxes)
+
+-- ============================================
+-- ESP RENDER
+-- ============================================
+local function RenderESP()
+    if not Config.ESP then
+        for _, esp in pairs(Drawings.ESP) do
+            for _, d in pairs(esp) do pcall(function() d.Visible = false end) end
+        end
+        return
+    end
+    
+    for _, p in ipairs(Players:GetPlayers()) do
+        if ValidatePlayer(p) then
+            local root = p.Character:FindFirstChild("HumanoidRootPart")
+            local pos, depth, onScreen = WorldToScreen(root.Position)
+            if onScreen and depth > 0 then
+                local esp = Drawings.ESP[p]
+                if not esp then
+                    esp = {}
+                    esp.Box = CreateDrawing("Square", { Thickness = 1, Color = Config.BoxColor, Filled = false, Visible = false })
+                    esp.BoxOutline = CreateDrawing("Square", { Thickness = 2, Color = Color3.fromRGB(0,0,0), Filled = false, Visible = false })
+                    esp.Name = CreateDrawing("Text", { Text = p.Name, Color = Color3.fromRGB(255,255,255), Size = 13, Center = true, Outline = true, OutlineColor = Color3.fromRGB(0,0,0), Visible = false })
+                    esp.Head = CreateDrawing("Circle", { Radius = 2.5, Filled = true, Color = Color3.fromRGB(255,255,255), Transparency = 0.2, NumSides = 16, Visible = false })
+                    esp.Tracer = CreateDrawing("Line", { Thickness = 1, Color = Config.BoxColor, Visible = false })
+                    esp.Distance = CreateDrawing("Text", { Text = "0M", Color = Color3.fromRGB(200,200,200), Size = 11, Center = true, Outline = true, OutlineColor = Color3.fromRGB(0,0,0), Visible = false })
+                    Drawings.ESP[p] = esp
+                end
+                
+                local scale = math.clamp(650 / (depth + 0.1) * 0.65, 0.45, 0.9)
+                local w = math.floor(22 * scale)
+                local h = math.floor(44 * scale)
+                local x, y = pos.X, pos.Y
+                
+                if Config.Box then
+                    esp.Box.Position = Vector2.new(x - w/2, y - h/2)
+                    esp.Box.Size = Vector2.new(w, h)
+                    esp.Box.Visible = true
+                    esp.BoxOutline.Position = Vector2.new(x - w/2 - 1, y - h/2 - 1)
+                    esp.BoxOutline.Size = Vector2.new(w + 2, h + 2)
+                    esp.BoxOutline.Visible = true
+                else
+                    if esp.Box then esp.Box.Visible = false end
+                    if esp.BoxOutline then esp.BoxOutline.Visible = false end
+                end
+                
+                if Config.Tracer and esp.Tracer then
+                    esp.Tracer.From = GetCenter()
+                    esp.Tracer.To = Vector2.new(x, y)
+                    esp.Tracer.Visible = true
+                elseif esp.Tracer then esp.Tracer.Visible = false end
+                
+                if Config.Head and p.Character:FindFirstChild("Head") and esp.Head then
+                    local hp = WorldToScreen(p.Character.Head.Position)
+                    esp.Head.Position = hp
+                    esp.Head.Visible = true
+                elseif esp.Head then esp.Head.Visible = false end
+                
+                if Config.Name and esp.Name then
+                    esp.Name.Position = Vector2.new(x, y - h/2 - 16)
+                    esp.Name.Text = string.upper(p.Name)
+                    esp.Name.Visible = true
+                elseif esp.Name then esp.Name.Visible = false end
+                
+                if Config.Distance and esp.Distance and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                    local dist = math.floor((LocalPlayer.Character.HumanoidRootPart.Position - root.Position).Magnitude)
+                    esp.Distance.Position = Vector2.new(x, y + h/2 + 14)
+                    esp.Distance.Text = dist .. "M"
+                    esp.Distance.Visible = true
+                elseif esp.Distance then esp.Distance.Visible = false end
+            end
+        end
+    end
+end
+
+RunService.RenderStepped:Connect(RenderESP)
+
+-- ============================================
+-- FOV CIRCLE
+-- ============================================
+RunService.RenderStepped:Connect(function()
+    if Config.FOV then
+        if not Drawings.FOV then
+            Drawings.FOV = CreateDrawing("Circle", {
+                Radius = Config.FOVRadius,
+                Color = Color3.fromRGB(255,255,255),
+                Thickness = 1.5,
+                Filled = false,
+                NumSides = 64,
+                Visible = true,
+                Position = GetCenter()
+            })
+        else
+            Drawings.FOV.Position = GetCenter()
+            Drawings.FOV.Radius = Config.FOVRadius
+            Drawings.FOV.Visible = true
+        end
+    elseif Drawings.FOV then
+        Drawings.FOV.Visible = false
+    end
+end)
+
+-- ============================================
+-- FLY SYSTEM
+-- ============================================
+local FlyActive = false
+local FlyBV = nil
+local FlyKeys = { W = false, S = false, A = false, D = false, Space = false, Shift = false }
+
+local function StartFly()
+    if not LocalPlayer.Character then return end
+    local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if not root or not hum then return end
+    hum.PlatformStand = true
+    FlyBV = Instance.new("BodyVelocity")
+    FlyBV.Velocity = Vector3.new(0,0,0)
+    FlyBV.MaxForce = Vector3.new(10000,10000,10000)
+    FlyBV.P = 1000
+    FlyBV.Parent = root
+    FlyActive = true
+end
+
+local function StopFly()
+    if FlyBV then FlyBV:Destroy() FlyBV = nil end
+    if LocalPlayer and LocalPlayer.Character then
+        local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if hum then hum.PlatformStand = false end
+    end
+    FlyActive = false
+end
+
+UserInputService.InputBegan:Connect(function(i, g)
+    if g then return end
+    if i.KeyCode == Enum.KeyCode.W then FlyKeys.W = true end
+    if i.KeyCode == Enum.KeyCode.S then FlyKeys.S = true end
+    if i.KeyCode == Enum.KeyCode.A then FlyKeys.A = true end
+    if i.KeyCode == Enum.KeyCode.D then FlyKeys.D = true end
+    if i.KeyCode == Enum.KeyCode.Space then FlyKeys.Space = true end
+    if i.KeyCode == Enum.KeyCode.LeftShift then FlyKeys.Shift = true end
+end)
+
+UserInputService.InputEnded:Connect(function(i, g)
+    if g then return end
+    if i.KeyCode == Enum.KeyCode.W then FlyKeys.W = false end
+    if i.KeyCode == Enum.KeyCode.S then FlyKeys.S = false end
+    if i.KeyCode == Enum.KeyCode.A then FlyKeys.A = false end
+    if i.KeyCode == Enum.KeyCode.D then FlyKeys.D = false end
+    if i.KeyCode == Enum.KeyCode.Space then FlyKeys.Space = false end
+    if i.KeyCode == Enum.KeyCode.LeftShift then FlyKeys.Shift = false end
+end)
+
+RunService.Heartbeat:Connect(function()
+    if Config.Fly and FlyActive and FlyBV then
+        local cam = Workspace.CurrentCamera
+        local move = Vector3.new()
+        if FlyKeys.W then move = move + cam.CFrame.LookVector end
+        if FlyKeys.S then move = move - cam.CFrame.LookVector end
+        if FlyKeys.A then move = move - cam.CFrame.RightVector end
+        if FlyKeys.D then move = move + cam.CFrame.RightVector end
+        if FlyKeys.Space then move = move + Vector3.new(0, 1, 0) end
+        if FlyKeys.Shift then move = move - Vector3.new(0, 1, 0) end
+        if move.Magnitude > 0 then
+            FlyBV.Velocity = move.Unit * Config.FlySpeed
+        else
+            FlyBV.Velocity = Vector3.new(0,0,0)
+        end
+    end
+end)
+
+-- ============================================
+-- INFINITE JUMP
+-- ============================================
+UserInputService.JumpRequest:Connect(function()
+    if Config.InfJump and LocalPlayer and LocalPlayer.Character then
+        local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+    end
+end)
+
+-- ============================================
+-- NOCLIP
+-- ============================================
+local NoclipConnection = nil
+local function StartNoClip()
+    if NoclipConnection then NoclipConnection:Disconnect() end
+    NoclipConnection = RunService.Stepped:Connect(function()
+        if Config.NoClip and LocalPlayer and LocalPlayer.Character then
+            for _, p in ipairs(LocalPlayer.Character:GetDescendants()) do
+                if p:IsA("BasePart") then p.CanCollide = false end
+            end
+        end
+    end)
+end
+StartNoClip()
+
+-- ============================================
+-- AUTO RELOAD
+-- ============================================
+local lastReload = 0
+RunService.Heartbeat:Connect(function()
+    if Config.AutoReload then
+        local now = tick()
+        if now - lastReload < 1 then return end
+        if LocalPlayer and LocalPlayer.Character then
+            local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
+            if tool then
+                local ammo = tool:FindFirstChild("Ammo") or tool:FindFirstChild("CurrentAmmo")
+                if ammo and tonumber(ammo.Value) and tonumber(ammo.Value) <= 0 then
+                    local remote = ReplicatedStorage:FindFirstChild("Reload") or ReplicatedStorage:FindFirstChild("ReloadRemote")
+                    if remote and remote:IsA("RemoteEvent") then
+                        remote:FireServer()
+                        lastReload = now
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- ============================================
+-- INFINITE RANGE
+-- ============================================
+local oldIndex = mt.__index
+mt.__index = newcclosure(function(self, k)
+    if Config.InfiniteRange and not checkcaller() then
+        if k == "MaxRange" or k == "Range" or k == "BulletRange" then return 9999 end
+    end
+    return oldIndex(self, k)
+end)
+
+-- ============================================
+-- WALKSPEED
+-- ============================================
+RunService.RenderStepped:Connect(function()
+    if LocalPlayer and LocalPlayer.Character then
+        local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum.WalkSpeed = Config.Walkspeed and Config.WalkspeedValue or 16
+        end
+    end
+end)
+
+-- ============================================
+-- CLICK TELEPORT
+-- ============================================
+local ClickTPConnection = nil
+local function SetupClickTP()
+    if ClickTPConnection then ClickTPConnection:Disconnect() end
+    if Config.ClickTP then
+        ClickTPConnection = Mouse.Button1Down:Connect(function()
+            if LocalPlayer and LocalPlayer.Character then
+                local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if root then
+                    local target = Mouse.Hit
+                    if target then
+                        root.CFrame = CFrame.new(target.X, target.Y + 3, target.Z)
+                    end
+                end
+            end
+        end)
+    end
+end
+
+-- ============================================
+-- MAIN UI INITIALIZATION
+-- ============================================
+function ArcUI:Init()
+    local sg = CreateScreenGui()
+    
+    -- Main Window
+    local mainFrame = CreateMainFrame(sg, UDim2.new(0, 800, 0, 550), UDim2.new(0.5, -400, 0.5, -275))
+    
+    -- Title Bar
+    local titleBar = CreateTitleBar(mainFrame, "ARC CLIENT • ARSENAL")
+    
+    -- Tab Container
+    local tabContainer, tabList = CreateTabContainer(mainFrame)
+    
+    -- Content Container
+    local contentContainer = CreateContentContainer(mainFrame)
+    
+    -- ========================================
+    -- SILENT AIM TAB
+    -- ========================================
+    local silentTabBtn = CreateTabButton(tabContainer, "Silent Aim", "🎯")
+    local silentContent = Instance.new("Frame")
+    silentContent.Name = "SilentContent"
+    silentContent.Size = UDim2.new(1, 0, 1, 0)
+    silentContent.BackgroundTransparency = 1
+    silentContent.Visible = false
+    silentContent.Parent = contentContainer
+    
+    local silentList = Instance.new("UIListLayout")
+    silentList.SortOrder = Enum.SortOrder.LayoutOrder
+    silentList.Padding = UDim.new(0, 15)
+    silentList.Parent = silentContent
+    
+    local silentSection1 = CreateSection(silentContent, "Silent Aim Settings")
+    self:CreateToggle(silentSection1, "Enable Silent Aim", "silent_aim", false, function(v) Config.SilentAim = v end)
+    self:CreateDropdown(silentSection1, "Target Part", "silent_part", {"Head", "UpperTorso", "LowerTorso", "HumanoidRootPart"}, "Head", function(v) Config.SilentPart = v end)
+    self:CreateSlider(silentSection1, "FOV", "silent_fov", 50, 400, 200, "px", function(v) Config.SilentFOV = v end)
+    self:CreateSlider(silentSection1, "Prediction", "silent_pred", 0, 300, 130, "ms", function(v) Config.SilentPrediction = v / 1000 end)
+    self:CreateToggle(silentSection1, "Team Check", "silent_team", true, function(v) Config.SilentTeam = v end)
+    self:CreateToggle(silentSection1, "Visible Check", "silent_visible", true, function(v) Config.SilentVisible = v end)
+    
+    -- ========================================
+    -- AIMBOT TAB
+    -- ========================================
+    local aimTabBtn = CreateTabButton(tabContainer, "Aimbot", "🔫")
+    local aimContent = Instance.new("Frame")
+    aimContent.Name = "AimContent"
+    aimContent.Size = UDim2.new(1, 0, 1, 0)
+    aimContent.BackgroundTransparency = 1
+    aimContent.Visible = false
+    aimContent.Parent = contentContainer
+    
+    local aimList = Instance.new("UIListLayout")
+    aimList.SortOrder = Enum.SortOrder.LayoutOrder
+    aimList.Padding = UDim.new(0, 15)
+    aimList.Parent = aimContent
+    
+    local aimSection1 = CreateSection(aimContent, "Aimbot Settings")
+    self:CreateToggle(aimSection1, "Enable Aimbot", "aimbot", false, function(v) Config.Aimbot = v end)
+    self:CreateDropdown(aimSection1, "Target Part", "aim_part", {"Head", "UpperTorso", "LowerTorso", "HumanoidRootPart"}, "Head", function(v) Config.AimPart = v end)
+    self:CreateSlider(aimSection1, "FOV", "aim_fov", 50, 300, 150, "px", function(v) Config.AimFOV = v end)
+    self:CreateSlider(aimSection1, "Smoothness", "aim_smooth", 0.05, 0.5, 0.2, "", function(v) Config.AimSmooth = v end)
+    self:CreateSlider(aimSection1, "Prediction", "aim_pred", 0, 300, 130, "ms", function(v) Config.AimPrediction = v / 1000 end)
+    
+    local triggerSection = CreateSection(aimContent, "Triggerbot")
+    self:CreateToggle(triggerSection, "Enable Triggerbot", "triggerbot", false, function(v) Config.Triggerbot = v end)
+    self:CreateSlider(triggerSection, "Trigger FOV", "trigger_fov", 30, 150, 60, "px", function(v) Config.TriggerFOV = v end)
+    self:CreateSlider(triggerSection, "Trigger Delay", "trigger_delay", 0, 100, 25, "ms", function(v) Config.TriggerDelay = v / 1000 end)
+    
+    local rapidSection = CreateSection(aimContent, "Rapid Fire")
+    self:CreateToggle(rapidSection, "Enable Rapid Fire", "rapid_fire", false, function(v) Config.RapidFire = v end)
+    self:CreateSlider(rapidSection, "Fire Rate", "rapid_fire_delay", 10, 100, 50, "ms", function(v) Config.RapidFireDelay = v / 1000 end)
+    
+    -- ========================================
+    -- HITBOX TAB
+    -- ========================================
+    local hitboxTabBtn = CreateTabButton(tabContainer, "Hitbox", "📦")
+    local hitboxContent = Instance.new("Frame")
+    hitboxContent.Name = "HitboxContent"
+    hitboxContent.Size = UDim2.new(1, 0, 1, 0)
+    hitboxContent.BackgroundTransparency = 1
+    hitboxContent.Visible = false
+    hitboxContent.Parent = contentContainer
+    
+    local hitboxList = Instance.new("UIListLayout")
+    hitboxList.SortOrder = Enum.SortOrder.LayoutOrder
+    hitboxList.Padding = UDim.new(0, 15)
+    hitboxList.Parent = hitboxContent
+    
+    local hitboxSection = CreateSection(hitboxContent, "Hitbox Expander")
+    self:CreateToggle(hitboxSection, "Enable Hitbox Expander", "hitbox", false, function(v) Config.HitboxExpander = v; UpdateHitboxes() end)
+    self:CreateSlider(hitboxSection, "Hitbox Size", "hitbox_size", 5, 40, 21, "studs", function(v) Config.HitboxSize = v; UpdateHitboxes() end)
+    self:CreateSlider(hitboxSection, "Transparency", "hitbox_trans", 0, 10, 6, "/10", function(v) Config.HitboxTransparency = v; UpdateHitboxes() end)
+    self:CreateToggle(hitboxSection, "Disable Collision", "hitbox_nocollide", false, function(v) Config.HitboxNoCollision = v; UpdateHitboxes() end)
+    self:CreateDropdown(hitboxSection, "Team Check", "hitbox_team", {"FFA", "Everyone", "Enemies Only"}, "FFA", function(v) Config.HitboxTeamCheck = v; UpdateHitboxes() end)
+    
+    -- ========================================
+    -- VISUALS TAB
+    -- ========================================
+    local visualTabBtn = CreateTabButton(tabContainer, "Visuals", "👁️")
+    local visualContent = Instance.new("Frame")
+    visualContent.Name = "VisualContent"
+    visualContent.Size = UDim2.new(1, 0, 1, 0)
+    visualContent.BackgroundTransparency = 1
+    visualContent.Visible = false
+    visualContent.Parent = contentContainer
+    
+    local visualList = Instance.new("UIListLayout")
+    visualList.SortOrder = Enum.SortOrder.LayoutOrder
+    visualList.Padding = UDim.new(0, 15)
+    visualList.Parent = visualContent
+    
+    local espSection = CreateSection(visualContent, "ESP Settings")
+    self:CreateToggle(espSection, "Enable ESP", "esp", false, function(v) Config.ESP = v end)
+    self:CreateToggle(espSection, "2D Box", "box", false, function(v) Config.Box = v end)
+    self:CreateToggle(espSection, "Tracer", "tracer", false, function(v) Config.Tracer = v end)
+    self:CreateToggle(espSection, "Head Dot", "head", false, function(v) Config.Head = v end)
+    self:CreateToggle(espSection, "Name Tag", "name", false, function(v) Config.Name = v end)
+    self:CreateToggle(espSection, "Distance", "distance", false, function(v) Config.Distance = v end)
+    self:CreateDropdown(espSection, "Box Color", "box_color", {"White", "Red", "Green", "Blue", "Yellow"}, "White", function(v) 
+        local colors = {White=Color3.fromRGB(255,255,255), Red=Color3.fromRGB(255,70,70), Green=Color3.fromRGB(70,255,70), Blue=Color3.fromRGB(70,70,255), Yellow=Color3.fromRGB(255,255,70)}
+        Config.BoxColor = colors[v] 
+    end)
+    
+    local fovSection = CreateSection(visualContent, "FOV Circle")
+    self:CreateToggle(fovSection, "Show FOV Circle", "fov", false, function(v) Config.FOV = v end)
+    self:CreateSlider(fovSection, "FOV Radius", "fov_radius", 50, 300, 150, "px", function(v) Config.FOVRadius = v end)
+    
+    -- ========================================
+    -- MOVEMENT TAB
+    -- ========================================
+    local moveTabBtn = CreateTabButton(tabContainer, "Movement", "🏃")
+    local moveContent = Instance.new("Frame")
+    moveContent.Name = "MoveContent"
+    moveContent.Size = UDim2.new(1, 0, 1, 0)
+    moveContent.BackgroundTransparency = 1
+    moveContent.Visible = false
+    moveContent.Parent = contentContainer
+    
+    local moveList = Instance.new("UIListLayout")
+    moveList.SortOrder = Enum.SortOrder.LayoutOrder
+    moveList.Padding = UDim.new(0, 15)
+    moveList.Parent = moveContent
+    
+    local speedSection = CreateSection(moveContent, "Speed")
+    self:CreateToggle(speedSection, "Walkspeed", "walkspeed", false, function(v) Config.Walkspeed = v end)
+    self:CreateSlider(speedSection, "Walkspeed Value", "walkspeed_val", 16, 100, 32, "studs", function(v) Config.WalkspeedValue = v end)
+    
+    local flySection = CreateSection(moveContent, "Flight")
+    self:CreateToggle(flySection, "Enable Fly", "fly", false, function(v) Config.Fly = v; if v then StartFly() else StopFly() end end)
+    self:CreateSlider(flySection, "Fly Speed", "fly_speed", 20, 150, 50, "studs", function(v) Config.FlySpeed = v end)
+    
+    local jumpSection = CreateSection(moveContent, "Jump")
+    self:CreateToggle(jumpSection, "Infinite Jump", "infjump", false, function(v) Config.InfJump = v end)
+    
+    local noclipSection = CreateSection(moveContent, "Collision")
+    self:CreateToggle(noclipSection, "NoClip", "noclip", false, function(v) Config.NoClip = v end)
+    
+    -- ========================================
+    -- UTILITY TAB
+    -- ========================================
+    local utilTabBtn = CreateTabButton(tabContainer, "Utility", "⚙️")
+    local utilContent = Instance.new("Frame")
+    utilContent.Name = "UtilContent"
+    utilContent.Size = UDim2.new(1, 0, 1, 0)
+    utilContent.BackgroundTransparency = 1
+    utilContent.Visible = false
+    utilContent.Parent = contentContainer
+    
+    local utilList = Instance.new("UIListLayout")
+    utilList.SortOrder = Enum.SortOrder.LayoutOrder
+    utilList.Padding = UDim.new(0, 15)
+    utilList.Parent = utilContent
+    
+    local weaponSection = CreateSection(utilContent, "Weapon")
+    self:CreateToggle(weaponSection, "Auto Reload", "auto_reload", false, function(v) Config.AutoReload = v end)
+    self:CreateToggle(weaponSection, "Infinite Range", "infinite_range", false, function(v) Config.InfiniteRange = v end)
+    
+    local combatSection = CreateSection(utilContent, "Combat")
+    self:CreateButton(combatSection, "Kill All", function()
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character then
+                local h = p.Character:FindFirstChildOfClass("Humanoid")
+                if h and h.Health > 0 then h.Health = 0 end
+            end
+        end
+    end)
+    
+    self:CreateToggle(combatSection, "Click Teleport", "clicktp", false, function(v) Config.ClickTP = v; SetupClickTP() end)
+    
+    -- ========================================
+    -- INFO TAB
+    -- ========================================
+    local infoTabBtn = CreateTabButton(tabContainer, "Info", "ℹ️")
+    local infoContent = Instance.new("Frame")
+    infoContent.Name = "InfoContent"
+    infoContent.Size = UDim2.new(1, 0, 1, 0)
+    infoContent.BackgroundTransparency = 1
+    infoContent.Visible = false
+    infoContent.Parent = contentContainer
+    
+    local infoList = Instance.new("UIListLayout")
+    infoList.SortOrder = Enum.SortOrder.LayoutOrder
+    infoList.Padding = UDim.new(0, 15)
+    infoList.Parent = infoContent
+    
+    local aboutSection = CreateSection(infoContent, "About")
+    self:CreateLabel(aboutSection, "ARC CLIENT | ARSENAL")
+    self:CreateLabel(aboutSection, "Developer: mqp6/developer")
+    self:CreateLabel(aboutSection, "Version: 9.0.0")
+    self:CreateLabel(aboutSection, "Build: 02/12/2026")
+    self:CreateLabel(aboutSection, " ")
+    
+    local featuresSection = CreateSection(infoContent, "Features")
+    self:CreateLabel(featuresSection, "✓ Silent Aim - Working")
+    self:CreateLabel(featuresSection, "✓ Aimbot - Working")
+    self:CreateLabel(featuresSection, "✓ Triggerbot - Working")
+    self:CreateLabel(featuresSection, "✓ Rapid Fire - Working")
+    self:CreateLabel(featuresSection, "✓ Hitbox Expander - Working")
+    self:CreateLabel(featuresSection, "✓ ESP - Working")
+    self:CreateLabel(featuresSection, "✓ Fly - Working")
+    self:CreateLabel(featuresSection, "✓ Infinite Jump - Working")
+    self:CreateLabel(featuresSection, "✓ NoClip - Working")
+    self:CreateLabel(featuresSection, "✓ Auto Reload - Working")
+    self:CreateLabel(featuresSection, "✓ Infinite Range - Working")
+    self:CreateLabel(featuresSection, " ")
+    
+    local discordSection = CreateSection(infoContent, "Community")
+    self:CreateButton(discordSection, "Copy Discord Invite", function()
+        setclipboard("https://discord.gg/rmpQfYtnWd")
+    end)
+    
+    -- Tab Switching Logic
+    local tabs = {
+        silentTabBtn, aimTabBtn, hitboxTabBtn, visualTabBtn, moveTabBtn, utilTabBtn, infoTabBtn
+    }
+    local contents = {
+        silentContent, aimContent, hitboxContent, visualContent, moveContent, utilContent, infoContent
+    }
+    
+    for i, btn in ipairs(tabs) do
+        btn.MouseButton1Click:Connect(function()
+            for _, b in ipairs(tabs) do
+                b.BackgroundColor3 = ArcUI.Colors.Element
+                b.TextColor3 = ArcUI.Colors.TextDim
+            end
+            btn.BackgroundColor3 = ArcUI.Colors.Accent
+            btn.TextColor3 = ArcUI.Colors.Text
+            
+            for _, c in ipairs(contents) do
+                c.Visible = false
+            end
+            contents[i].Visible = true
+        end)
+    end
+    
+    -- Set default tab
+    tabs[1].BackgroundColor3 = ArcUI.Colors.Accent
+    tabs[1].TextColor3 = ArcUI.Colors.Text
+    contents[1].Visible = true
+end
+
+-- ============================================
+-- START
+-- ============================================
+if ArcUI.KeySystem.Enabled then
+    ShowKeySystem()
+else
+    ArcUI:Init()
+end
+
+StarterGui:SetCore("SendNotification", {
+    Title = "ARC CLIENT",
+    Text = "Custom UI Loaded • Press RightShift to open",
+    Duration = 3
+})
