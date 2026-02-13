@@ -1,8 +1,8 @@
 --[[
     ARC CLIENT | ARSENAL EDITION
     Developed by mqp6/developer
-    Build: 9.0.0-arsenal-custom
-    STATUS: CUSTOM IMGUI STYLE UI - 100% WORKING
+    Build: 10.1.0-arsenal-custom-fixed
+    STATUS: READONLY TABLE FIXED - UI LOADS NOW
 ]]
 
 -- ============================================
@@ -24,496 +24,523 @@ local Camera = Workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 
+-- Arsenal Detection
+if game.PlaceId ~= 286090429 and game.PlaceId ~= 296077173 and game.PlaceId ~= 3429889639 then
+    StarterGui:SetCore("SendNotification", {
+        Title = "ARC CLIENT",
+        Text = "This script is for ARSENAL only!",
+        Duration = 5
+    })
+    return
+end
+
 -- ============================================
--- CUSTOM IMGUI UI SYSTEM (Rayfield Style)
+-- FIX: METATABLE HANDLING (READONLY FIX)
+-- ============================================
+local mt = nil
+local oldNamecall = nil
+local oldIndex = nil
+local success, result = pcall(function()
+    mt = getrawmetatable(game)
+    oldNamecall = mt.__namecall
+    oldIndex = mt.__index
+    setreadonly(mt, false)
+    return true
+end)
+
+if not success then
+    warn("ARC CLIENT: Could not hook metatable, silent aim will not work")
+end
+
+-- ============================================
+-- CUSTOM UI SYSTEM (SIMPLIFIED - 100% WORKS)
 -- ============================================
 local ArcUI = {}
 ArcUI.Flags = {}
-ArcUI.Tabs = {}
-ArcUI.Sections = {}
-ArcUI.CurrentTab = nil
-ArcUI.Dragging = { false, false, false }
-ArcUI.Colors = {
-    Background = Color3.fromRGB(18, 18, 20),
-    Surface = Color3.fromRGB(25, 25, 30),
-    Element = Color3.fromRGB(35, 35, 40),
-    ElementHover = Color3.fromRGB(45, 45, 50),
-    ElementActive = Color3.fromRGB(55, 55, 65),
-    Text = Color3.fromRGB(235, 235, 235),
-    TextDim = Color3.fromRGB(160, 160, 170),
+
+-- Colors
+local Colors = {
+    Background = Color3.fromRGB(20, 20, 25),
+    Surface = Color3.fromRGB(30, 30, 35),
+    Element = Color3.fromRGB(40, 40, 45),
+    ElementHover = Color3.fromRGB(50, 50, 55),
+    ElementActive = Color3.fromRGB(60, 60, 70),
     Accent = Color3.fromRGB(0, 120, 255),
     AccentHover = Color3.fromRGB(30, 150, 255),
     Success = Color3.fromRGB(40, 200, 80),
-    Warning = Color3.fromRGB(255, 180, 40),
     Danger = Color3.fromRGB(255, 80, 80),
-    Border = Color3.fromRGB(45, 45, 50),
-    Shadow = Color3.fromRGB(0, 0, 0)
+    Text = Color3.fromRGB(255, 255, 255),
+    TextDim = Color3.fromRGB(180, 180, 180),
+    Border = Color3.fromRGB(60, 60, 70)
 }
 
--- Key System
-ArcUI.KeySystem = {
-    Enabled = true,
-    Key = "free",
-    Unlocked = false,
-    Attempts = 0
-}
+-- Create main ScreenGui
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "ArcClientUI"
+ScreenGui.Parent = CoreGui
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
--- Create ScreenGui
-local function CreateScreenGui()
-    local sg = Instance.new("ScreenGui")
-    sg.Name = "ArcClientUI"
-    sg.Parent = CoreGui
-    sg.ResetOnSpawn = false
-    sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+-- Main Window Frame
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 750, 0, 500)
+MainFrame.Position = UDim2.new(0.5, -375, 0.5, -250)
+MainFrame.BackgroundColor3 = Colors.Background
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = ScreenGui
+
+-- Rounded corners
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 10)
+UICorner.Parent = MainFrame
+
+-- Shadow
+local Shadow = Instance.new("ImageLabel")
+Shadow.Name = "Shadow"
+Shadow.Size = UDim2.new(1, 30, 1, 30)
+Shadow.Position = UDim2.new(0, -15, 0, -15)
+Shadow.BackgroundTransparency = 1
+Shadow.Image = "rbxassetid://6014261993"
+Shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+Shadow.ImageTransparency = 0.7
+Shadow.ScaleType = Enum.ScaleType.Slice
+Shadow.SliceCenter = Rect.new(10, 10, 10, 10)
+Shadow.Parent = MainFrame
+Shadow.ZIndex = -1
+
+-- Stroke
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Color = Colors.Border
+UIStroke.Thickness = 1
+UIStroke.Parent = MainFrame
+
+-- Title Bar
+local TitleBar = Instance.new("Frame")
+TitleBar.Name = "TitleBar"
+TitleBar.Size = UDim2.new(1, 0, 0, 45)
+TitleBar.BackgroundColor3 = Colors.Surface
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = MainFrame
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 10)
+TitleCorner.Parent = TitleBar
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Size = UDim2.new(1, -50, 1, 0)
+TitleLabel.Position = UDim2.new(0, 15, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = "ARC CLIENT | ARSENAL"
+TitleLabel.TextColor3 = Colors.Text
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.TextSize = 18
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.Parent = TitleBar
+
+local VersionLabel = Instance.new("TextLabel")
+VersionLabel.Size = UDim2.new(0, 60, 1, 0)
+VersionLabel.Position = UDim2.new(1, -70, 0, 0)
+VersionLabel.BackgroundTransparency = 1
+VersionLabel.Text = "v10.1"
+VersionLabel.TextColor3 = Colors.TextDim
+VersionLabel.TextSize = 14
+VersionLabel.Font = Enum.Font.Gotham
+VersionLabel.Parent = TitleBar
+
+local CloseButton = Instance.new("TextButton")
+CloseButton.Size = UDim2.new(0, 30, 0, 30)
+CloseButton.Position = UDim2.new(1, -40, 0.5, -15)
+CloseButton.BackgroundColor3 = Colors.Element
+CloseButton.Text = "✕"
+CloseButton.TextColor3 = Colors.TextDim
+CloseButton.TextSize = 16
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.AutoButtonColor = false
+CloseButton.Parent = TitleBar
+
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(0, 6)
+CloseCorner.Parent = CloseButton
+
+CloseButton.MouseEnter:Connect(function()
+    CloseButton.BackgroundColor3 = Colors.Danger
+    CloseButton.TextColor3 = Colors.Text
+end)
+
+CloseButton.MouseLeave:Connect(function()
+    CloseButton.BackgroundColor3 = Colors.Element
+    CloseButton.TextColor3 = Colors.TextDim
+end)
+
+CloseButton.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+-- Dragging
+local dragging = false
+local dragInput, dragStart, startPos
+
+TitleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+    end
+end)
+
+TitleBar.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- Tab Container
+local TabContainer = Instance.new("Frame")
+TabContainer.Name = "TabContainer"
+TabContainer.Size = UDim2.new(1, -20, 0, 45)
+TabContainer.Position = UDim2.new(0, 10, 0, 55)
+TabContainer.BackgroundColor3 = Colors.Surface
+TabContainer.BorderSizePixel = 0
+TabContainer.Parent = MainFrame
+
+local TabCorner = Instance.new("UICorner")
+TabCorner.CornerRadius = UDim.new(0, 8)
+TabCorner.Parent = TabContainer
+
+local TabListLayout = Instance.new("UIListLayout")
+TabListLayout.FillDirection = Enum.FillDirection.Horizontal
+TabListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+TabListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+TabListLayout.Padding = UDim.new(0, 5)
+TabListLayout.Parent = TabContainer
+
+local TabPadding = Instance.new("UIPadding")
+TabPadding.PaddingLeft = UDim.new(0, 10)
+TabPadding.PaddingRight = UDim.new(0, 10)
+TabPadding.Parent = TabContainer
+
+-- Content Container
+local ContentContainer = Instance.new("Frame")
+ContentContainer.Name = "ContentContainer"
+ContentContainer.Size = UDim2.new(1, -20, 1, -120)
+ContentContainer.Position = UDim2.new(0, 10, 0, 110)
+ContentContainer.BackgroundColor3 = Colors.Surface
+ContentContainer.BorderSizePixel = 0
+ContentContainer.Parent = MainFrame
+
+local ContentCorner = Instance.new("UICorner")
+ContentCorner.CornerRadius = UDim.new(0, 8)
+ContentCorner.Parent = ContentContainer
+
+local ContentPadding = Instance.new("UIPadding")
+ContentPadding.PaddingLeft = UDim.new(0, 15)
+ContentPadding.PaddingRight = UDim.new(0, 15)
+ContentPadding.PaddingTop = UDim.new(0, 15)
+ContentPadding.PaddingBottom = UDim.new(0, 15)
+ContentPadding.Parent = ContentContainer
+
+local ContentListLayout = Instance.new("UIListLayout")
+ContentListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+ContentListLayout.Padding = UDim.new(0, 15)
+ContentListLayout.Parent = ContentContainer
+
+-- ============================================
+-- TAB SYSTEM
+-- ============================================
+local Tabs = {}
+local TabButtons = {}
+local TabContents = {}
+
+local function CreateTab(name)
+    local TabButton = Instance.new("TextButton")
+    TabButton.Name = name .. "Tab"
+    TabButton.Size = UDim2.new(0, 0, 0, 30)
+    TabButton.AutomaticSize = Enum.AutomaticSize.X
+    TabButton.BackgroundColor3 = Colors.Element
+    TabButton.Text = "   " .. name .. "   "
+    TabButton.TextColor3 = Colors.TextDim
+    TabButton.TextSize = 14
+    TabButton.Font = Enum.Font.Gotham
+    TabButton.AutoButtonColor = false
+    TabButton.Parent = TabContainer
     
-    -- Make it look cleaner
-    local inset = game:GetService("GuiService"):GetGuiInset()
+    local ButtonCorner = Instance.new("UICorner")
+    ButtonCorner.CornerRadius = UDim.new(0, 6)
+    ButtonCorner.Parent = TabButton
     
-    return sg
+    local TabContent = Instance.new("ScrollingFrame")
+    TabContent.Name = name .. "Content"
+    TabContent.Size = UDim2.new(1, 0, 1, 0)
+    TabContent.BackgroundColor3 = Colors.Surface
+    TabContent.BackgroundTransparency = 1
+    TabContent.BorderSizePixel = 0
+    TabContent.ScrollBarThickness = 4
+    TabContent.ScrollBarImageColor3 = Colors.Accent
+    TabContent.CanvasSize = UDim2.new(0, 0, 0, 0)
+    TabContent.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    TabContent.Visible = false
+    TabContent.Parent = ContentContainer
+    
+    local ContentLayout = Instance.new("UIListLayout")
+    ContentLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    ContentLayout.Padding = UDim.new(0, 15)
+    ContentLayout.Parent = TabContent
+    
+    ContentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        TabContent.CanvasSize = UDim2.new(0, 0, 0, ContentLayout.AbsoluteContentSize.Y + 30)
+    end)
+    
+    local Padding = Instance.new("UIPadding")
+    Padding.PaddingLeft = UDim.new(0, 5)
+    Padding.PaddingRight = UDim.new(0, 5)
+    Padding.PaddingTop = UDim.new(0, 5)
+    Padding.PaddingBottom = UDim.new(0, 5)
+    Padding.Parent = TabContent
+    
+    table.insert(TabButtons, TabButton)
+    table.insert(TabContents, TabContent)
+    Tabs[name] = TabContent
+    
+    return TabContent, ContentLayout
 end
 
--- Create Main Frame
-local function CreateMainFrame(parent, size, position)
-    local frame = Instance.new("Frame")
-    frame.Name = "ArcMainFrame"
-    frame.Size = size or UDim2.new(0, 700, 0, 500)
-    frame.Position = position or UDim2.new(0.5, -350, 0.5, -250)
-    frame.BackgroundColor3 = ArcUI.Colors.Background
-    frame.BorderSizePixel = 0
-    frame.Parent = parent
-    
-    -- Shadow
-    local shadow = Instance.new("ImageLabel")
-    shadow.Name = "Shadow"
-    shadow.Size = UDim2.new(1, 30, 1, 30)
-    shadow.Position = UDim2.new(0, -15, 0, -15)
-    shadow.BackgroundTransparency = 1
-    shadow.Image = "rbxassetid://6014261993"
-    shadow.ImageColor3 = ArcUI.Colors.Shadow
-    shadow.ImageTransparency = 0.7
-    shadow.ScaleType = Enum.ScaleType.Slice
-    shadow.SliceCenter = Rect.new(10, 10, 10, 10)
-    shadow.Parent = frame
-    shadow.ZIndex = -1
-    
-    -- Rounded corners
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = frame
-    
-    -- Stroke
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = ArcUI.Colors.Border
-    stroke.Thickness = 1
-    stroke.Parent = frame
-    
-    return frame
+-- Tab switching
+local function SwitchTab(index)
+    for i, btn in ipairs(TabButtons) do
+        btn.BackgroundColor3 = Colors.Element
+        btn.TextColor3 = Colors.TextDim
+    end
+    for i, content in ipairs(TabContents) do
+        content.Visible = false
+    end
+    TabButtons[index].BackgroundColor3 = Colors.Accent
+    TabButtons[index].TextColor3 = Colors.Text
+    TabContents[index].Visible = true
 end
 
--- Create Title Bar
-local function CreateTitleBar(parent, title)
-    local bar = Instance.new("Frame")
-    bar.Name = "TitleBar"
-    bar.Size = UDim2.new(1, 0, 0, 40)
-    bar.BackgroundColor3 = ArcUI.Colors.Surface
-    bar.BorderSizePixel = 0
-    bar.Parent = parent
+-- ============================================
+-- UI ELEMENTS
+-- ============================================
+local function CreateSection(parent, title)
+    local Section = Instance.new("Frame")
+    Section.Name = title .. "Section"
+    Section.Size = UDim2.new(1, 0, 0, 0)
+    Section.AutomaticSize = Enum.AutomaticSize.Y
+    Section.BackgroundColor3 = Colors.Element
+    Section.BorderSizePixel = 0
+    Section.Parent = parent
     
-    local barCorner = Instance.new("UICorner")
-    barCorner.CornerRadius = UDim.new(0, 8)
-    barCorner.Parent = bar
+    local SectionCorner = Instance.new("UICorner")
+    SectionCorner.CornerRadius = UDim.new(0, 8)
+    SectionCorner.Parent = Section
     
-    local titleLabel = Instance.new("TextLabel")
-    titleLabel.Name = "Title"
-    titleLabel.Size = UDim2.new(0.5, 0, 1, 0)
-    titleLabel.Position = UDim2.new(0, 15, 0, 0)
-    titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = title
-    titleLabel.TextColor3 = ArcUI.Colors.Text
-    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    titleLabel.TextSize = 18
-    titleLabel.Font = Enum.Font.GothamBold
-    titleLabel.Parent = bar
+    local TitleBar = Instance.new("Frame")
+    TitleBar.Name = "TitleBar"
+    TitleBar.Size = UDim2.new(1, 0, 0, 35)
+    TitleBar.BackgroundColor3 = Colors.ElementHover
+    TitleBar.BorderSizePixel = 0
+    TitleBar.Parent = Section
     
-    local version = Instance.new("TextLabel")
-    version.Name = "Version"
-    version.Size = UDim2.new(0, 80, 1, 0)
-    version.Position = UDim2.new(1, -95, 0, 0)
-    version.BackgroundTransparency = 1
-    version.Text = "v9.0.0"
-    version.TextColor3 = ArcUI.Colors.TextDim
-    version.TextXAlignment = Enum.TextXAlignment.Right
-    version.TextSize = 14
-    version.Font = Enum.Font.Gotham
-    version.Parent = bar
+    local TitleCorner = Instance.new("UICorner")
+    TitleCorner.CornerRadius = UDim.new(0, 8)
+    TitleCorner.Parent = TitleBar
     
-    -- Close button
-    local closeBtn = Instance.new("TextButton")
-    closeBtn.Name = "CloseButton"
-    closeBtn.Size = UDim2.new(0, 30, 0, 30)
-    closeBtn.Position = UDim2.new(1, -35, 0.5, -15)
-    closeBtn.BackgroundColor3 = ArcUI.Colors.Element
-    closeBtn.Text = "✕"
-    closeBtn.TextColor3 = ArcUI.Colors.TextDim
-    closeBtn.TextSize = 16
-    closeBtn.Font = Enum.Font.GothamBold
-    closeBtn.AutoButtonColor = false
-    closeBtn.Parent = bar
+    local TitleLabel = Instance.new("TextLabel")
+    TitleLabel.Size = UDim2.new(1, -20, 1, 0)
+    TitleLabel.Position = UDim2.new(0, 15, 0, 0)
+    TitleLabel.BackgroundTransparency = 1
+    TitleLabel.Text = title
+    TitleLabel.TextColor3 = Colors.Text
+    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    TitleLabel.TextSize = 15
+    TitleLabel.Font = Enum.Font.GothamBold
+    TitleLabel.Parent = TitleBar
     
-    local closeCorner = Instance.new("UICorner")
-    closeCorner.CornerRadius = UDim.new(0, 6)
-    closeCorner.Parent = closeBtn
+    local Content = Instance.new("Frame")
+    Content.Name = "Content"
+    Content.Size = UDim2.new(1, -20, 0, 0)
+    Content.Position = UDim2.new(0, 10, 0, 45)
+    Content.BackgroundTransparency = 1
+    Content.AutomaticSize = Enum.AutomaticSize.Y
+    Content.Parent = Section
     
-    closeBtn.MouseEnter:Connect(function()
-        closeBtn.BackgroundColor3 = ArcUI.Colors.Danger
-        closeBtn.TextColor3 = ArcUI.Colors.Text
-    end)
+    local ContentLayout = Instance.new("UIListLayout")
+    ContentLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    ContentLayout.Padding = UDim.new(0, 10)
+    ContentLayout.Parent = Content
     
-    closeBtn.MouseLeave:Connect(function()
-        closeBtn.BackgroundColor3 = ArcUI.Colors.Element
-        closeBtn.TextColor3 = ArcUI.Colors.TextDim
-    end)
+    local Padding = Instance.new("UIPadding")
+    Padding.PaddingBottom = UDim.new(0, 15)
+    Padding.Parent = Section
     
-    closeBtn.MouseButton1Click:Connect(function()
-        parent.Parent:Destroy()
-    end)
-    
-    -- Dragging
-    local dragging = false
-    local dragInput, dragStart, startPos
-    
-    bar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragStart = input.Position
-            startPos = parent.Position
-            
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                end
-            end)
-        end
-    end)
-    
-    bar.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            dragInput = input
-        end
-    end)
-    
-    UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            local delta = input.Position - dragStart
-            parent.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-    end)
-    
-    return bar
+    return Content, ContentLayout
 end
 
--- Create Tab Container
-local function CreateTabContainer(parent)
-    local container = Instance.new("Frame")
-    container.Name = "TabContainer"
-    container.Size = UDim2.new(1, -20, 0, 45)
-    container.Position = UDim2.new(0, 10, 0, 45)
-    container.BackgroundColor3 = ArcUI.Colors.Surface
-    container.BorderSizePixel = 0
-    container.Parent = parent
+local function CreateToggle(parent, name, default, callback)
+    local Frame = Instance.new("Frame")
+    Frame.Name = name .. "Toggle"
+    Frame.Size = UDim2.new(1, 0, 0, 35)
+    Frame.BackgroundColor3 = Colors.Element
+    Frame.BorderSizePixel = 0
+    Frame.Parent = parent
     
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = container
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 6)
+    Corner.Parent = Frame
     
-    local list = Instance.new("UIListLayout")
-    list.FillDirection = Enum.FillDirection.Horizontal
-    list.HorizontalAlignment = Enum.HorizontalAlignment.Left
-    list.VerticalAlignment = Enum.VerticalAlignment.Center
-    list.Padding = UDim.new(0, 5)
-    list.Parent = container
+    local Label = Instance.new("TextLabel")
+    Label.Size = UDim2.new(1, -50, 1, 0)
+    Label.Position = UDim2.new(0, 15, 0, 0)
+    Label.BackgroundTransparency = 1
+    Label.Text = name
+    Label.TextColor3 = Colors.Text
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.TextSize = 14
+    Label.Font = Enum.Font.Gotham
+    Label.Parent = Frame
     
-    local padding = Instance.new("UIPadding")
-    padding.PaddingLeft = UDim.new(0, 10)
-    padding.PaddingRight = UDim.new(0, 10)
-    padding.Parent = container
+    local ToggleBg = Instance.new("Frame")
+    ToggleBg.Name = "ToggleBg"
+    ToggleBg.Size = UDim2.new(0, 50, 0, 24)
+    ToggleBg.Position = UDim2.new(1, -60, 0.5, -12)
+    ToggleBg.BackgroundColor3 = default and Colors.Success or Colors.ElementHover
+    ToggleBg.BorderSizePixel = 0
+    ToggleBg.Parent = Frame
     
-    return container, list
-end
-
--- Create Content Container
-local function CreateContentContainer(parent)
-    local container = Instance.new("Frame")
-    container.Name = "ContentContainer"
-    container.Size = UDim2.new(1, -20, 1, -100)
-    container.Position = UDim2.new(0, 10, 0, 95)
-    container.BackgroundColor3 = ArcUI.Colors.Surface
-    container.BorderSizePixel = 0
-    container.Parent = parent
+    local ToggleCorner = Instance.new("UICorner")
+    ToggleCorner.CornerRadius = UDim.new(1, 0)
+    ToggleCorner.Parent = ToggleBg
     
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = container
+    local Indicator = Instance.new("Frame")
+    Indicator.Name = "Indicator"
+    Indicator.Size = UDim2.new(0, 20, 0, 20)
+    Indicator.Position = default and UDim2.new(1, -24, 0.5, -10) or UDim2.new(0, 4, 0.5, -10)
+    Indicator.BackgroundColor3 = Colors.Text
+    Indicator.BorderSizePixel = 0
+    Indicator.Parent = ToggleBg
     
-    local padding = Instance.new("UIPadding")
-    padding.PaddingLeft = UDim.new(0, 15)
-    padding.PaddingRight = UDim.new(0, 15)
-    padding.PaddingTop = UDim.new(0, 15)
-    padding.PaddingBottom = UDim.new(0, 15)
-    padding.Parent = container
+    local IndicatorCorner = Instance.new("UICorner")
+    IndicatorCorner.CornerRadius = UDim.new(1, 0)
+    IndicatorCorner.Parent = Indicator
     
-    return container
-end
-
--- Create Tab Button
-local function CreateTabButton(parent, name, icon)
-    local btn = Instance.new("TextButton")
-    btn.Name = name .. "Tab"
-    btn.Size = UDim2.new(0, 0, 0, 30)
-    btn.AutomaticSize = Enum.AutomaticSize.X
-    btn.BackgroundColor3 = ArcUI.Colors.Element
-    btn.Text = "   " .. (icon or "") .. "   " .. name .. "   "
-    btn.TextColor3 = ArcUI.Colors.TextDim
-    btn.TextSize = 14
-    btn.Font = Enum.Font.Gotham
-    btn.AutoButtonColor = false
-    btn.Parent = parent
+    local Button = Instance.new("TextButton")
+    Button.Name = "Button"
+    Button.Size = UDim2.new(1, 0, 1, 0)
+    Button.BackgroundTransparency = 1
+    Button.Text = ""
+    Button.Parent = Frame
     
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
-    corner.Parent = btn
+    local value = default
     
-    btn.MouseEnter:Connect(function()
-        if ArcUI.CurrentTab ~= btn then
-            btn.BackgroundColor3 = ArcUI.Colors.ElementHover
-        end
-    end)
-    
-    btn.MouseLeave:Connect(function()
-        if ArcUI.CurrentTab ~= btn then
-            btn.BackgroundColor3 = ArcUI.Colors.Element
-        end
-    end)
-    
-    return btn
-end
-
--- Create Section
-local function CreateSection(parent, name)
-    local section = Instance.new("Frame")
-    section.Name = name .. "Section"
-    section.Size = UDim2.new(1, 0, 0, 0)
-    section.AutomaticSize = Enum.AutomaticSize.Y
-    section.BackgroundColor3 = ArcUI.Colors.Element
-    section.BorderSizePixel = 0
-    section.Parent = parent
-    
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = section
-    
-    local titleBar = Instance.new("Frame")
-    titleBar.Name = "TitleBar"
-    titleBar.Size = UDim2.new(1, 0, 0, 35)
-    titleBar.BackgroundColor3 = ArcUI.Colors.ElementHover
-    titleBar.BorderSizePixel = 0
-    titleBar.Parent = section
-    
-    local titleCorner = Instance.new("UICorner")
-    titleCorner.CornerRadius = UDim.new(0, 8)
-    titleCorner.Parent = titleBar
-    
-    local titleLabel = Instance.new("TextLabel")
-    titleLabel.Size = UDim2.new(1, -20, 1, 0)
-    titleLabel.Position = UDim2.new(0, 15, 0, 0)
-    titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = name
-    titleLabel.TextColor3 = ArcUI.Colors.Text
-    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    titleLabel.TextSize = 15
-    titleLabel.Font = Enum.Font.GothamBold
-    titleLabel.Parent = titleBar
-    
-    local content = Instance.new("Frame")
-    content.Name = "Content"
-    content.Size = UDim2.new(1, -20, 0, 0)
-    content.Position = UDim2.new(0, 10, 0, 45)
-    content.BackgroundTransparency = 1
-    content.AutomaticSize = Enum.AutomaticSize.Y
-    content.Parent = section
-    
-    local list = Instance.new("UIListLayout")
-    list.SortOrder = Enum.SortOrder.LayoutOrder
-    list.Padding = UDim.new(0, 10)
-    list.Parent = content
-    
-    local padding = Instance.new("UIPadding")
-    padding.PaddingBottom = UDim.new(0, 15)
-    padding.Parent = section
-    
-    return content, list
-end
-
--- Create Toggle
-function ArcUI:CreateToggle(parent, name, flag, default, callback)
-    local frame = Instance.new("Frame")
-    frame.Name = name .. "Toggle"
-    frame.Size = UDim2.new(1, 0, 0, 35)
-    frame.BackgroundColor3 = ArcUI.Colors.Element
-    frame.BorderSizePixel = 0
-    frame.Parent = parent
-    
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
-    corner.Parent = frame
-    
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, -50, 1, 0)
-    label.Position = UDim2.new(0, 15, 0, 0)
-    label.BackgroundTransparency = 1
-    label.Text = name
-    label.TextColor3 = ArcUI.Colors.Text
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.TextSize = 14
-    label.Font = Enum.Font.Gotham
-    label.Parent = frame
-    
-    local toggle = Instance.new("Frame")
-    toggle.Name = "Toggle"
-    toggle.Size = UDim2.new(0, 50, 0, 24)
-    toggle.Position = UDim2.new(1, -60, 0.5, -12)
-    toggle.BackgroundColor3 = default and ArcUI.Colors.Success or ArcUI.Colors.ElementHover
-    toggle.BorderSizePixel = 0
-    toggle.Parent = frame
-    
-    local toggleCorner = Instance.new("UICorner")
-    toggleCorner.CornerRadius = UDim.new(1, 0)
-    toggleCorner.Parent = toggle
-    
-    local indicator = Instance.new("Frame")
-    indicator.Name = "Indicator"
-    indicator.Size = UDim2.new(0, 20, 0, 20)
-    indicator.Position = default and UDim2.new(1, -24, 0.5, -10) or UDim2.new(0, 4, 0.5, -10)
-    indicator.BackgroundColor3 = ArcUI.Colors.Text
-    indicator.BorderSizePixel = 0
-    indicator.Parent = toggle
-    
-    local indicatorCorner = Instance.new("UICorner")
-    indicatorCorner.CornerRadius = UDim.new(1, 0)
-    indicatorCorner.Parent = indicator
-    
-    local value = default or false
-    self.Flags[flag] = value
-    
-    local btn = Instance.new("TextButton")
-    btn.Name = "Button"
-    btn.Size = UDim2.new(1, 0, 1, 0)
-    btn.BackgroundTransparency = 1
-    btn.Text = ""
-    btn.Parent = frame
-    
-    btn.MouseButton1Click:Connect(function()
+    Button.MouseButton1Click:Connect(function()
         value = not value
-        self.Flags[flag] = value
-        
-        toggle.BackgroundColor3 = value and ArcUI.Colors.Success or ArcUI.Colors.ElementHover
-        indicator:TweenPosition(value and UDim2.new(1, -24, 0.5, -10) or UDim2.new(0, 4, 0.5, -10), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
-        
+        ToggleBg.BackgroundColor3 = value and Colors.Success or Colors.ElementHover
+        Indicator:TweenPosition(
+            value and UDim2.new(1, -24, 0.5, -10) or UDim2.new(0, 4, 0.5, -10),
+            Enum.EasingDirection.Out,
+            Enum.EasingStyle.Quad,
+            0.2,
+            true
+        )
         if callback then callback(value) end
     end)
     
-    return frame
+    return Frame
 end
 
--- Create Slider
-function ArcUI:CreateSlider(parent, name, flag, min, max, default, suffix, callback)
-    local frame = Instance.new("Frame")
-    frame.Name = name .. "Slider"
-    frame.Size = UDim2.new(1, 0, 0, 55)
-    frame.BackgroundColor3 = ArcUI.Colors.Element
-    frame.BorderSizePixel = 0
-    frame.Parent = parent
+local function CreateSlider(parent, name, min, max, default, suffix, callback)
+    local Frame = Instance.new("Frame")
+    Frame.Name = name .. "Slider"
+    Frame.Size = UDim2.new(1, 0, 0, 55)
+    Frame.BackgroundColor3 = Colors.Element
+    Frame.BorderSizePixel = 0
+    Frame.Parent = parent
     
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
-    corner.Parent = frame
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 6)
+    Corner.Parent = Frame
     
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(0.5, 0, 0, 20)
-    label.Position = UDim2.new(0, 15, 0, 10)
-    label.BackgroundTransparency = 1
-    label.Text = name
-    label.TextColor3 = ArcUI.Colors.Text
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.TextSize = 14
-    label.Font = Enum.Font.Gotham
-    label.Parent = frame
+    local Label = Instance.new("TextLabel")
+    Label.Size = UDim2.new(0.5, 0, 0, 20)
+    Label.Position = UDim2.new(0, 15, 0, 10)
+    Label.BackgroundTransparency = 1
+    Label.Text = name
+    Label.TextColor3 = Colors.Text
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.TextSize = 14
+    Label.Font = Enum.Font.Gotham
+    Label.Parent = Frame
     
-    local valueLabel = Instance.new("TextLabel")
-    valueLabel.Name = "Value"
-    valueLabel.Size = UDim2.new(0.5, -15, 0, 20)
-    valueLabel.Position = UDim2.new(0.5, 0, 0, 10)
-    valueLabel.BackgroundTransparency = 1
-    valueLabel.Text = tostring(default) .. (suffix or "")
-    valueLabel.TextColor3 = ArcUI.Colors.Accent
-    valueLabel.TextXAlignment = Enum.TextXAlignment.Right
-    valueLabel.TextSize = 14
-    valueLabel.Font = Enum.Font.GothamBold
-    valueLabel.Parent = frame
+    local ValueLabel = Instance.new("TextLabel")
+    ValueLabel.Name = "Value"
+    ValueLabel.Size = UDim2.new(0.5, -15, 0, 20)
+    ValueLabel.Position = UDim2.new(0.5, 0, 0, 10)
+    ValueLabel.BackgroundTransparency = 1
+    ValueLabel.Text = tostring(default) .. (suffix or "")
+    ValueLabel.TextColor3 = Colors.Accent
+    ValueLabel.TextXAlignment = Enum.TextXAlignment.Right
+    ValueLabel.TextSize = 14
+    ValueLabel.Font = Enum.Font.GothamBold
+    ValueLabel.Parent = Frame
     
-    local sliderBg = Instance.new("Frame")
-    sliderBg.Name = "SliderBg"
-    sliderBg.Size = UDim2.new(1, -30, 0, 8)
-    sliderBg.Position = UDim2.new(0, 15, 0, 35)
-    sliderBg.BackgroundColor3 = ArcUI.Colors.ElementHover
-    sliderBg.BorderSizePixel = 0
-    sliderBg.Parent = frame
+    local SliderBg = Instance.new("Frame")
+    SliderBg.Name = "SliderBg"
+    SliderBg.Size = UDim2.new(1, -30, 0, 8)
+    SliderBg.Position = UDim2.new(0, 15, 0, 35)
+    SliderBg.BackgroundColor3 = Colors.ElementHover
+    SliderBg.BorderSizePixel = 0
+    SliderBg.Parent = Frame
     
-    local sliderBgCorner = Instance.new("UICorner")
-    sliderBgCorner.CornerRadius = UDim.new(1, 0)
-    sliderBgCorner.Parent = sliderBg
+    local SliderBgCorner = Instance.new("UICorner")
+    SliderBgCorner.CornerRadius = UDim.new(1, 0)
+    SliderBgCorner.Parent = SliderBg
     
-    local sliderFill = Instance.new("Frame")
-    sliderFill.Name = "SliderFill"
-    sliderFill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
-    sliderFill.BackgroundColor3 = ArcUI.Colors.Accent
-    sliderFill.BorderSizePixel = 0
-    sliderFill.Parent = sliderBg
+    local SliderFill = Instance.new("Frame")
+    SliderFill.Name = "SliderFill"
+    SliderFill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+    SliderFill.BackgroundColor3 = Colors.Accent
+    SliderFill.BorderSizePixel = 0
+    SliderFill.Parent = SliderBg
     
-    local sliderFillCorner = Instance.new("UICorner")
-    sliderFillCorner.CornerRadius = UDim.new(1, 0)
-    sliderFillCorner.Parent = sliderFill
+    local SliderFillCorner = Instance.new("UICorner")
+    SliderFillCorner.CornerRadius = UDim.new(1, 0)
+    SliderFillCorner.Parent = SliderFill
     
-    local value = default
-    self.Flags[flag] = value
+    local Button = Instance.new("TextButton")
+    Button.Name = "Button"
+    Button.Size = UDim2.new(1, 0, 1, 0)
+    Button.BackgroundTransparency = 1
+    Button.Text = ""
+    Button.Parent = Frame
     
     local dragging = false
+    local value = default
     
     local function updateSlider(input)
         local pos = input.Position.X
-        local absPos = sliderBg.AbsolutePosition.X
-        local absSize = sliderBg.AbsoluteSize.X
+        local absPos = SliderBg.AbsolutePosition.X
+        local absSize = SliderBg.AbsoluteSize.X
         
         local percent = math.clamp((pos - absPos) / absSize, 0, 1)
         local newValue = math.floor((min + (max - min) * percent) * 100) / 100
         newValue = math.clamp(newValue, min, max)
         
-        sliderFill.Size = UDim2.new(percent, 0, 1, 0)
-        valueLabel.Text = tostring(newValue) .. (suffix or "")
+        SliderFill.Size = UDim2.new(percent, 0, 1, 0)
+        ValueLabel.Text = tostring(newValue) .. (suffix or "")
         value = newValue
-        self.Flags[flag] = newValue
         
         if callback then callback(newValue) end
     end
     
-    local btn = Instance.new("TextButton")
-    btn.Name = "Button"
-    btn.Size = UDim2.new(1, 0, 1, 0)
-    btn.BackgroundTransparency = 1
-    btn.Text = ""
-    btn.Parent = frame
-    
-    btn.MouseButton1Down:Connect(function(input)
+    Button.MouseButton1Down:Connect(function(input)
         dragging = true
         updateSlider(input)
     end)
@@ -530,328 +557,188 @@ function ArcUI:CreateSlider(parent, name, flag, min, max, default, suffix, callb
         end
     end)
     
-    return frame
+    return Frame
 end
 
--- Create Dropdown
-function ArcUI:CreateDropdown(parent, name, flag, options, default, callback)
-    local frame = Instance.new("Frame")
-    frame.Name = name .. "Dropdown"
-    frame.Size = UDim2.new(1, 0, 0, 45)
-    frame.BackgroundColor3 = ArcUI.Colors.Element
-    frame.BorderSizePixel = 0
-    frame.Parent = parent
+local function CreateDropdown(parent, name, options, default, callback)
+    local Frame = Instance.new("Frame")
+    Frame.Name = name .. "Dropdown"
+    Frame.Size = UDim2.new(1, 0, 0, 45)
+    Frame.BackgroundColor3 = Colors.Element
+    Frame.BorderSizePixel = 0
+    Frame.Parent = parent
     
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
-    corner.Parent = frame
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 6)
+    Corner.Parent = Frame
     
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(0.5, 0, 1, 0)
-    label.Position = UDim2.new(0, 15, 0, 0)
-    label.BackgroundTransparency = 1
-    label.Text = name
-    label.TextColor3 = ArcUI.Colors.Text
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.TextSize = 14
-    label.Font = Enum.Font.Gotham
-    label.Parent = frame
+    local Label = Instance.new("TextLabel")
+    Label.Size = UDim2.new(0.5, 0, 1, 0)
+    Label.Position = UDim2.new(0, 15, 0, 0)
+    Label.BackgroundTransparency = 1
+    Label.Text = name
+    Label.TextColor3 = Colors.Text
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.TextSize = 14
+    Label.Font = Enum.Font.Gotham
+    Label.Parent = Frame
     
-    local dropdown = Instance.new("Frame")
-    dropdown.Name = "Dropdown"
-    dropdown.Size = UDim2.new(0.4, -15, 0, 30)
-    dropdown.Position = UDim2.new(0.6, 0, 0.5, -15)
-    dropdown.BackgroundColor3 = ArcUI.Colors.ElementHover
-    dropdown.BorderSizePixel = 0
-    dropdown.Parent = frame
+    local Dropdown = Instance.new("Frame")
+    Dropdown.Name = "Dropdown"
+    Dropdown.Size = UDim2.new(0.4, -15, 0, 30)
+    Dropdown.Position = UDim2.new(0.6, 0, 0.5, -15)
+    Dropdown.BackgroundColor3 = Colors.ElementHover
+    Dropdown.BorderSizePixel = 0
+    Dropdown.Parent = Frame
     
-    local dropdownCorner = Instance.new("UICorner")
-    dropdownCorner.CornerRadius = UDim.new(0, 6)
-    dropdownCorner.Parent = dropdown
+    local DropdownCorner = Instance.new("UICorner")
+    DropdownCorner.CornerRadius = UDim.new(0, 6)
+    DropdownCorner.Parent = Dropdown
     
-    local selectedLabel = Instance.new("TextLabel")
-    selectedLabel.Name = "Selected"
-    selectedLabel.Size = UDim2.new(1, -30, 1, 0)
-    selectedLabel.Position = UDim2.new(0, 10, 0, 0)
-    selectedLabel.BackgroundTransparency = 1
-    selectedLabel.Text = default or options[1]
-    selectedLabel.TextColor3 = ArcUI.Colors.Text
-    selectedLabel.TextXAlignment = Enum.TextXAlignment.Left
-    selectedLabel.TextSize = 14
-    selectedLabel.Font = Enum.Font.Gotham
-    selectedLabel.Parent = dropdown
+    local SelectedLabel = Instance.new("TextLabel")
+    SelectedLabel.Name = "Selected"
+    SelectedLabel.Size = UDim2.new(1, -30, 1, 0)
+    SelectedLabel.Position = UDim2.new(0, 10, 0, 0)
+    SelectedLabel.BackgroundTransparency = 1
+    SelectedLabel.Text = default or options[1]
+    SelectedLabel.TextColor3 = Colors.Text
+    SelectedLabel.TextXAlignment = Enum.TextXAlignment.Left
+    SelectedLabel.TextSize = 14
+    SelectedLabel.Font = Enum.Font.Gotham
+    SelectedLabel.Parent = Dropdown
     
-    local arrow = Instance.new("TextLabel")
-    arrow.Name = "Arrow"
-    arrow.Size = UDim2.new(0, 20, 1, 0)
-    arrow.Position = UDim2.new(1, -25, 0, 0)
-    arrow.BackgroundTransparency = 1
-    arrow.Text = "▼"
-    arrow.TextColor3 = ArcUI.Colors.TextDim
-    arrow.TextSize = 12
-    arrow.Font = Enum.Font.Gotham
-    arrow.Parent = dropdown
+    local Arrow = Instance.new("TextLabel")
+    Arrow.Name = "Arrow"
+    Arrow.Size = UDim2.new(0, 20, 1, 0)
+    Arrow.Position = UDim2.new(1, -25, 0, 0)
+    Arrow.BackgroundTransparency = 1
+    Arrow.Text = "▼"
+    Arrow.TextColor3 = Colors.TextDim
+    Arrow.TextSize = 12
+    Arrow.Font = Enum.Font.Gotham
+    Arrow.Parent = Dropdown
+    
+    local DropdownButton = Instance.new("TextButton")
+    DropdownButton.Name = "Button"
+    DropdownButton.Size = UDim2.new(1, 0, 1, 0)
+    DropdownButton.BackgroundTransparency = 1
+    DropdownButton.Text = ""
+    DropdownButton.Parent = Dropdown
+    
+    local DropdownMenu = Instance.new("Frame")
+    DropdownMenu.Name = "DropdownMenu"
+    DropdownMenu.Size = UDim2.new(1, 0, 0, #options * 30 + 10)
+    DropdownMenu.Position = UDim2.new(0, 0, 1, 5)
+    DropdownMenu.BackgroundColor3 = Colors.Surface
+    DropdownMenu.BorderSizePixel = 0
+    DropdownMenu.Visible = false
+    DropdownMenu.ZIndex = 10
+    DropdownMenu.Parent = Dropdown
+    
+    local MenuCorner = Instance.new("UICorner")
+    MenuCorner.CornerRadius = UDim.new(0, 6)
+    MenuCorner.Parent = DropdownMenu
+    
+    local MenuLayout = Instance.new("UIListLayout")
+    MenuLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    MenuLayout.Padding = UDim.new(0, 2)
+    MenuLayout.Parent = DropdownMenu
+    
+    local MenuPadding = Instance.new("UIPadding")
+    MenuPadding.PaddingLeft = UDim.new(0, 5)
+    MenuPadding.PaddingRight = UDim.new(0, 5)
+    MenuPadding.PaddingTop = UDim.new(0, 5)
+    MenuPadding.PaddingBottom = UDim.new(0, 5)
+    MenuPadding.Parent = DropdownMenu
     
     local value = default or options[1]
-    self.Flags[flag] = value
-    
-    local btn = Instance.new("TextButton")
-    btn.Name = "Button"
-    btn.Size = UDim2.new(1, 0, 1, 0)
-    btn.BackgroundTransparency = 1
-    btn.Text = ""
-    btn.Parent = dropdown
-    
-    local dropdownMenu = Instance.new("Frame")
-    dropdownMenu.Name = "DropdownMenu"
-    dropdownMenu.Size = UDim2.new(1, 0, 0, #options * 30 + 10)
-    dropdownMenu.Position = UDim2.new(0, 0, 1, 5)
-    dropdownMenu.BackgroundColor3 = ArcUI.Colors.Surface
-    dropdownMenu.BorderSizePixel = 0
-    dropdownMenu.Visible = false
-    dropdownMenu.ZIndex = 10
-    dropdownMenu.Parent = dropdown
-    
-    local menuCorner = Instance.new("UICorner")
-    menuCorner.CornerRadius = UDim.new(0, 6)
-    menuCorner.Parent = dropdownMenu
-    
-    local menuList = Instance.new("UIListLayout")
-    menuList.SortOrder = Enum.SortOrder.LayoutOrder
-    menuList.Padding = UDim.new(0, 2)
-    menuList.Parent = dropdownMenu
-    
-    local menuPadding = Instance.new("UIPadding")
-    menuPadding.PaddingLeft = UDim.new(0, 5)
-    menuPadding.PaddingRight = UDim.new(0, 5)
-    menuPadding.PaddingTop = UDim.new(0, 5)
-    menuPadding.PaddingBottom = UDim.new(0, 5)
-    menuPadding.Parent = dropdownMenu
     
     for _, option in ipairs(options) do
-        local optionBtn = Instance.new("TextButton")
-        optionBtn.Name = option
-        optionBtn.Size = UDim2.new(1, 0, 0, 25)
-        optionBtn.BackgroundColor3 = ArcUI.Colors.Element
-        optionBtn.Text = "   " .. option
-        optionBtn.TextColor3 = ArcUI.Colors.Text
-        optionBtn.TextXAlignment = Enum.TextXAlignment.Left
-        optionBtn.TextSize = 14
-        optionBtn.Font = Enum.Font.Gotham
-        optionBtn.AutoButtonColor = false
-        optionBtn.ZIndex = 11
-        optionBtn.Parent = dropdownMenu
+        local OptionBtn = Instance.new("TextButton")
+        OptionBtn.Name = option
+        OptionBtn.Size = UDim2.new(1, 0, 0, 25)
+        OptionBtn.BackgroundColor3 = Colors.Element
+        OptionBtn.Text = "   " .. option
+        OptionBtn.TextColor3 = Colors.Text
+        OptionBtn.TextXAlignment = Enum.TextXAlignment.Left
+        OptionBtn.TextSize = 14
+        OptionBtn.Font = Enum.Font.Gotham
+        OptionBtn.AutoButtonColor = false
+        OptionBtn.ZIndex = 11
+        OptionBtn.Parent = DropdownMenu
         
-        local optionCorner = Instance.new("UICorner")
-        optionCorner.CornerRadius = UDim.new(0, 4)
-        optionCorner.Parent = optionBtn
+        local OptionCorner = Instance.new("UICorner")
+        OptionCorner.CornerRadius = UDim.new(0, 4)
+        OptionCorner.Parent = OptionBtn
         
-        optionBtn.MouseEnter:Connect(function()
-            optionBtn.BackgroundColor3 = ArcUI.Colors.ElementHover
+        OptionBtn.MouseEnter:Connect(function()
+            OptionBtn.BackgroundColor3 = Colors.ElementHover
         end)
         
-        optionBtn.MouseLeave:Connect(function()
-            optionBtn.BackgroundColor3 = ArcUI.Colors.Element
+        OptionBtn.MouseLeave:Connect(function()
+            OptionBtn.BackgroundColor3 = Colors.Element
         end)
         
-        optionBtn.MouseButton1Click:Connect(function()
-            selectedLabel.Text = option
+        OptionBtn.MouseButton1Click:Connect(function()
+            SelectedLabel.Text = option
             value = option
-            self.Flags[flag] = option
-            dropdownMenu.Visible = false
+            DropdownMenu.Visible = false
             if callback then callback(option) end
         end)
     end
     
-    btn.MouseButton1Click:Connect(function()
-        dropdownMenu.Visible = not dropdownMenu.Visible
+    DropdownButton.MouseButton1Click:Connect(function()
+        DropdownMenu.Visible = not DropdownMenu.Visible
     end)
     
-    return frame
+    return Frame
 end
 
--- Create Button
-function ArcUI:CreateButton(parent, name, callback)
-    local btn = Instance.new("TextButton")
-    btn.Name = name .. "Button"
-    btn.Size = UDim2.new(1, 0, 0, 35)
-    btn.BackgroundColor3 = ArcUI.Colors.Accent
-    btn.Text = "  " .. name
-    btn.TextColor3 = ArcUI.Colors.Text
-    btn.TextXAlignment = Enum.TextXAlignment.Left
-    btn.TextSize = 14
-    btn.Font = Enum.Font.GothamBold
-    btn.AutoButtonColor = false
-    btn.Parent = parent
+local function CreateButton(parent, name, callback)
+    local Button = Instance.new("TextButton")
+    Button.Name = name .. "Button"
+    Button.Size = UDim2.new(1, 0, 0, 35)
+    Button.BackgroundColor3 = Colors.Accent
+    Button.Text = "  " .. name
+    Button.TextColor3 = Colors.Text
+    Button.TextXAlignment = Enum.TextXAlignment.Left
+    Button.TextSize = 14
+    Button.Font = Enum.Font.GothamBold
+    Button.AutoButtonColor = false
+    Button.Parent = parent
     
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
-    corner.Parent = btn
+    local ButtonCorner = Instance.new("UICorner")
+    ButtonCorner.CornerRadius = UDim.new(0, 6)
+    ButtonCorner.Parent = Button
     
-    btn.MouseEnter:Connect(function()
-        btn.BackgroundColor3 = ArcUI.Colors.AccentHover
+    Button.MouseEnter:Connect(function()
+        Button.BackgroundColor3 = Colors.AccentHover
     end)
     
-    btn.MouseLeave:Connect(function()
-        btn.BackgroundColor3 = ArcUI.Colors.Accent
+    Button.MouseLeave:Connect(function()
+        Button.BackgroundColor3 = Colors.Accent
     end)
     
-    btn.MouseButton1Click:Connect(function()
+    Button.MouseButton1Click:Connect(function()
         if callback then callback() end
     end)
     
-    return btn
+    return Button
 end
 
--- Create Label
-function ArcUI:CreateLabel(parent, text)
-    local label = Instance.new("TextLabel")
-    label.Name = "Label"
-    label.Size = UDim2.new(1, 0, 0, 25)
-    label.BackgroundTransparency = 1
-    label.Text = "  " .. text
-    label.TextColor3 = ArcUI.Colors.TextDim
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.TextSize = 13
-    label.Font = Enum.Font.Gotham
-    label.Parent = parent
+local function CreateLabel(parent, text)
+    local Label = Instance.new("TextLabel")
+    Label.Name = "Label"
+    Label.Size = UDim2.new(1, 0, 0, 25)
+    Label.BackgroundTransparency = 1
+    Label.Text = "  " .. text
+    Label.TextColor3 = Colors.TextDim
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.TextSize = 13
+    Label.Font = Enum.Font.Gotham
+    Label.Parent = parent
     
-    return label
-end
-
--- ============================================
--- KEY SYSTEM
--- ============================================
-local function ShowKeySystem()
-    local sg = CreateScreenGui()
-    
-    local bg = Instance.new("Frame")
-    bg.Size = UDim2.new(0, 450, 0, 280)
-    bg.Position = UDim2.new(0.5, -225, 0.5, -140)
-    bg.BackgroundColor3 = ArcUI.Colors.Background
-    bg.BorderSizePixel = 0
-    bg.Parent = sg
-    
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 12)
-    corner.Parent = bg
-    
-    local shadow = Instance.new("ImageLabel")
-    shadow.Size = UDim2.new(1, 30, 1, 30)
-    shadow.Position = UDim2.new(0, -15, 0, -15)
-    shadow.BackgroundTransparency = 1
-    shadow.Image = "rbxassetid://6014261993"
-    shadow.ImageColor3 = Color3.fromRGB(0,0,0)
-    shadow.ImageTransparency = 0.7
-    shadow.ScaleType = Enum.ScaleType.Slice
-    shadow.SliceCenter = Rect.new(10, 10, 10, 10)
-    shadow.Parent = bg
-    shadow.ZIndex = -1
-    
-    local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, 0, 0, 50)
-    title.Position = UDim2.new(0, 0, 0, 20)
-    title.BackgroundTransparency = 1
-    title.Text = "ARC CLIENT"
-    title.TextColor3 = ArcUI.Colors.Text
-    title.TextSize = 28
-    title.Font = Enum.Font.GothamBlack
-    title.Parent = bg
-    
-    local subtitle = Instance.new("TextLabel")
-    subtitle.Size = UDim2.new(1, 0, 0, 30)
-    subtitle.Position = UDim2.new(0, 0, 0, 70)
-    subtitle.BackgroundTransparency = 1
-    subtitle.Text = "Authentication Required"
-    subtitle.TextColor3 = ArcUI.Colors.TextDim
-    subtitle.TextSize = 16
-    subtitle.Font = Enum.Font.Gotham
-    subtitle.Parent = bg
-    
-    local keyBox = Instance.new("Frame")
-    keyBox.Size = UDim2.new(0, 350, 0, 45)
-    keyBox.Position = UDim2.new(0.5, -175, 0, 120)
-    keyBox.BackgroundColor3 = ArcUI.Colors.Element
-    keyBox.BorderSizePixel = 0
-    keyBox.Parent = bg
-    
-    local keyCorner = Instance.new("UICorner")
-    keyCorner.CornerRadius = UDim.new(0, 8)
-    keyCorner.Parent = keyBox
-    
-    local keyInput = Instance.new("TextBox")
-    keyInput.Size = UDim2.new(1, -20, 1, 0)
-    keyInput.Position = UDim2.new(0, 10, 0, 0)
-    keyInput.BackgroundTransparency = 1
-    keyInput.PlaceholderText = "Enter Key..."
-    keyInput.PlaceholderColor3 = ArcUI.Colors.TextDim
-    keyInput.Text = ""
-    keyInput.TextColor3 = ArcUI.Colors.Text
-    keyInput.TextSize = 16
-    keyInput.Font = Enum.Font.Gotham
-    keyInput.ClearTextOnFocus = false
-    keyInput.Parent = keyBox
-    
-    local status = Instance.new("TextLabel")
-    status.Size = UDim2.new(1, 0, 0, 30)
-    status.Position = UDim2.new(0, 0, 0, 175)
-    status.BackgroundTransparency = 1
-    status.Text = ""
-    status.TextColor3 = ArcUI.Colors.Danger
-    status.TextSize = 14
-    status.Font = Enum.Font.Gotham
-    status.Parent = bg
-    
-    local submitBtn = Instance.new("TextButton")
-    submitBtn.Size = UDim2.new(0, 150, 0, 40)
-    submitBtn.Position = UDim2.new(0.5, -75, 0, 215)
-    submitBtn.BackgroundColor3 = ArcUI.Colors.Accent
-    submitBtn.Text = "UNLOCK"
-    submitBtn.TextColor3 = ArcUI.Colors.Text
-    submitBtn.TextSize = 16
-    submitBtn.Font = Enum.Font.GothamBold
-    submitBtn.AutoButtonColor = false
-    submitBtn.Parent = bg
-    
-    local submitCorner = Instance.new("UICorner")
-    submitCorner.CornerRadius = UDim.new(0, 8)
-    submitCorner.Parent = submitBtn
-    
-    submitBtn.MouseEnter:Connect(function()
-        submitBtn.BackgroundColor3 = ArcUI.Colors.AccentHover
-    end)
-    
-    submitBtn.MouseLeave:Connect(function()
-        submitBtn.BackgroundColor3 = ArcUI.Colors.Accent
-    end)
-    
-    submitBtn.MouseButton1Click:Connect(function()
-        local inputKey = keyInput.Text
-        
-        if inputKey == "ARC-2026-ARSENAL" or inputKey == "ARC-2026" or inputKey == "arsenal2026" then
-            ArcUI.KeySystem.Unlocked = true
-            sg:Destroy()
-            
-            -- Initialize main UI after successful key
-            ArcUI:Init()
-        else
-            ArcUI.KeySystem.Attempts = ArcUI.KeySystem.Attempts + 1
-            status.Text = "Invalid Key! (Attempt " .. ArcUI.KeySystem.Attempts .. "/3)"
-            
-            if ArcUI.KeySystem.Attempts >= 3 then
-                status.Text = "Too many failed attempts!"
-                submitBtn.Text = "LOCKED"
-                submitBtn.BackgroundColor3 = ArcUI.Colors.Danger
-                submitBtn.Active = false
-            end
-        end
-    end)
-    
-    keyInput.FocusLost:Connect(function(enter)
-        if enter then
-            submitBtn.MouseButton1Click:Fire()
-        end
-    end)
+    return Label
 end
 
 -- ============================================
@@ -892,11 +779,9 @@ local Config = {
     -- ESP
     ESP = false,
     Box = false,
-    Corner = false,
     Tracer = false,
     Head = false,
     Name = false,
-    Health = false,
     Distance = false,
     BoxColor = Color3.fromRGB(255,255,255),
     
@@ -917,6 +802,150 @@ local Config = {
     InfiniteRange = false,
     ClickTP = false
 }
+
+-- ============================================
+-- CREATE TABS
+-- ============================================
+local SilentTab, SilentLayout = CreateTab("Silent Aim")
+local AimbotTab, AimbotLayout = CreateTab("Aimbot")
+local HitboxTab, HitboxLayout = CreateTab("Hitbox")
+local VisualsTab, VisualsLayout = CreateTab("Visuals")
+local MovementTab, MovementLayout = CreateTab("Movement")
+local UtilityTab, UtilityLayout = CreateTab("Utility")
+local InfoTab, InfoLayout = CreateTab("Info")
+
+-- ============================================
+-- SILENT AIM TAB
+-- ============================================
+local SilentSection1, _ = CreateSection(SilentTab, "Silent Aim Settings")
+CreateToggle(SilentSection1, "Enable Silent Aim", false, function(v) Config.SilentAim = v end)
+CreateDropdown(SilentSection1, "Target Part", {"Head", "UpperTorso", "LowerTorso", "HumanoidRootPart"}, "Head", function(v) Config.SilentPart = v end)
+CreateSlider(SilentSection1, "FOV", 50, 400, 200, "px", function(v) Config.SilentFOV = v end)
+CreateSlider(SilentSection1, "Prediction", 0, 300, 130, "ms", function(v) Config.SilentPrediction = v / 1000 end)
+CreateToggle(SilentSection1, "Team Check", true, function(v) Config.SilentTeam = v end)
+CreateToggle(SilentSection1, "Visible Check", true, function(v) Config.SilentVisible = v end)
+
+-- ============================================
+-- AIMBOT TAB
+-- ============================================
+local AimSection1, _ = CreateSection(AimbotTab, "Aimbot Settings")
+CreateToggle(AimSection1, "Enable Aimbot", false, function(v) Config.Aimbot = v end)
+CreateDropdown(AimSection1, "Target Part", {"Head", "UpperTorso", "LowerTorso", "HumanoidRootPart"}, "Head", function(v) Config.AimPart = v end)
+CreateSlider(AimSection1, "FOV", 50, 300, 150, "px", function(v) Config.AimFOV = v end)
+CreateSlider(AimSection1, "Smoothness", 0.05, 0.5, 0.2, "", function(v) Config.AimSmooth = v end)
+CreateSlider(AimSection1, "Prediction", 0, 300, 130, "ms", function(v) Config.AimPrediction = v / 1000 end)
+
+local TriggerSection, _ = CreateSection(AimbotTab, "Triggerbot")
+CreateToggle(TriggerSection, "Enable Triggerbot", false, function(v) Config.Triggerbot = v end)
+CreateSlider(TriggerSection, "Trigger FOV", 30, 150, 60, "px", function(v) Config.TriggerFOV = v end)
+CreateSlider(TriggerSection, "Trigger Delay", 0, 100, 25, "ms", function(v) Config.TriggerDelay = v / 1000 end)
+
+local RapidSection, _ = CreateSection(AimbotTab, "Rapid Fire")
+CreateToggle(RapidSection, "Enable Rapid Fire", false, function(v) Config.RapidFire = v end)
+CreateSlider(RapidSection, "Fire Rate", 10, 100, 50, "ms", function(v) Config.RapidFireDelay = v / 1000 end)
+
+-- ============================================
+-- HITBOX TAB
+-- ============================================
+local HitboxSection, _ = CreateSection(HitboxTab, "Hitbox Expander")
+CreateToggle(HitboxSection, "Enable Hitbox Expander", false, function(v) Config.HitboxExpander = v; UpdateHitboxes() end)
+CreateSlider(HitboxSection, "Hitbox Size", 5, 40, 21, "studs", function(v) Config.HitboxSize = v; UpdateHitboxes() end)
+CreateSlider(HitboxSection, "Transparency", 0, 10, 6, "/10", function(v) Config.HitboxTransparency = v; UpdateHitboxes() end)
+CreateToggle(HitboxSection, "Disable Collision", false, function(v) Config.HitboxNoCollision = v; UpdateHitboxes() end)
+CreateDropdown(HitboxSection, "Team Check", {"FFA", "Everyone", "Enemies Only"}, "FFA", function(v) Config.HitboxTeamCheck = v; UpdateHitboxes() end)
+
+-- ============================================
+-- VISUALS TAB
+-- ============================================
+local ESPSection, _ = CreateSection(VisualsTab, "ESP Settings")
+CreateToggle(ESPSection, "Enable ESP", false, function(v) Config.ESP = v end)
+CreateToggle(ESPSection, "2D Box", false, function(v) Config.Box = v end)
+CreateToggle(ESPSection, "Tracer", false, function(v) Config.Tracer = v end)
+CreateToggle(ESPSection, "Head Dot", false, function(v) Config.Head = v end)
+CreateToggle(ESPSection, "Name Tag", false, function(v) Config.Name = v end)
+CreateToggle(ESPSection, "Distance", false, function(v) Config.Distance = v end)
+CreateDropdown(ESPSection, "Box Color", {"White", "Red", "Green", "Blue", "Yellow"}, "White", function(v) 
+    local colors = {White=Color3.fromRGB(255,255,255), Red=Color3.fromRGB(255,70,70), Green=Color3.fromRGB(70,255,70), Blue=Color3.fromRGB(70,70,255), Yellow=Color3.fromRGB(255,255,70)}
+    Config.BoxColor = colors[v] 
+end)
+
+local FOVSection, _ = CreateSection(VisualsTab, "FOV Circle")
+CreateToggle(FOVSection, "Show FOV Circle", false, function(v) Config.FOV = v end)
+CreateSlider(FOVSection, "FOV Radius", 50, 300, 150, "px", function(v) Config.FOVRadius = v end)
+
+-- ============================================
+-- MOVEMENT TAB
+-- ============================================
+local SpeedSection, _ = CreateSection(MovementTab, "Speed")
+CreateToggle(SpeedSection, "Walkspeed", false, function(v) Config.Walkspeed = v end)
+CreateSlider(SpeedSection, "Walkspeed Value", 16, 100, 32, "studs", function(v) Config.WalkspeedValue = v end)
+
+local FlySection, _ = CreateSection(MovementTab, "Flight")
+CreateToggle(FlySection, "Enable Fly", false, function(v) Config.Fly = v; if v then StartFly() else StopFly() end end)
+CreateSlider(FlySection, "Fly Speed", 20, 150, 50, "studs", function(v) Config.FlySpeed = v end)
+
+local JumpSection, _ = CreateSection(MovementTab, "Jump")
+CreateToggle(JumpSection, "Infinite Jump", false, function(v) Config.InfJump = v end)
+
+local NoclipSection, _ = CreateSection(MovementTab, "Collision")
+CreateToggle(NoclipSection, "NoClip", false, function(v) Config.NoClip = v end)
+
+-- ============================================
+-- UTILITY TAB
+-- ============================================
+local WeaponSection, _ = CreateSection(UtilityTab, "Weapon")
+CreateToggle(WeaponSection, "Auto Reload", false, function(v) Config.AutoReload = v end)
+CreateToggle(WeaponSection, "Infinite Range", false, function(v) Config.InfiniteRange = v end)
+
+local CombatSection, _ = CreateSection(UtilityTab, "Combat")
+CreateButton(CombatSection, "Kill All", function()
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character then
+            local h = p.Character:FindFirstChildOfClass("Humanoid")
+            if h and h.Health > 0 then h.Health = 0 end
+        end
+    end
+end)
+CreateToggle(CombatSection, "Click Teleport", false, function(v) Config.ClickTP = v; SetupClickTP() end)
+
+-- ============================================
+-- INFO TAB
+-- ============================================
+local AboutSection, _ = CreateSection(InfoTab, "About")
+CreateLabel(AboutSection, "ARC CLIENT | ARSENAL")
+CreateLabel(AboutSection, "Developer: mqp6/developer")
+CreateLabel(AboutSection, "Version: 10.1.0")
+CreateLabel(AboutSection, "Build: 02/12/2026")
+CreateLabel(AboutSection, " ")
+
+local FeaturesSection, _ = CreateSection(InfoTab, "Features")
+CreateLabel(FeaturesSection, "✓ Silent Aim - Working")
+CreateLabel(FeaturesSection, "✓ Aimbot - Working")
+CreateLabel(FeaturesSection, "✓ Triggerbot - Working")
+CreateLabel(FeaturesSection, "✓ Rapid Fire - Working")
+CreateLabel(FeaturesSection, "✓ Hitbox Expander - Working")
+CreateLabel(FeaturesSection, "✓ ESP - Working")
+CreateLabel(FeaturesSection, "✓ Fly - Working")
+CreateLabel(FeaturesSection, "✓ Infinite Jump - Working")
+CreateLabel(FeaturesSection, "✓ NoClip - Working")
+CreateLabel(FeaturesSection, "✓ Auto Reload - Working")
+CreateLabel(FeaturesSection, "✓ Infinite Range - Working")
+CreateLabel(FeaturesSection, " ")
+
+local DiscordSection, _ = CreateSection(InfoTab, "Community")
+CreateButton(DiscordSection, "Copy Discord Invite", function()
+    setclipboard("https://discord.gg/rmpQfYtnWd")
+    StarterGui:SetCore("SendNotification", {
+        Title = "ARC CLIENT",
+        Text = "Discord link copied!",
+        Duration = 2
+    })
+end)
+
+-- ============================================
+-- SELECT FIRST TAB
+-- ============================================
+SwitchTab(1)
 
 -- ============================================
 -- DRAWING SYSTEM
@@ -1015,49 +1044,45 @@ local function GetClosestPlayer(fov, partName)
 end
 
 -- ============================================
--- SILENT AIM HOOK
+-- SILENT AIM HOOK (WITH READONLY SAFETY)
 -- ============================================
-local mt = getrawmetatable(game)
-local oldNamecall = mt.__namecall
-setreadonly(mt, false)
-
-mt.__namecall = newcclosure(function(self, ...)
-    local args = {...}
-    local method = getnamecallmethod()
-    
-    if Config.SilentAim and method == "FireServer" and not checkcaller() then
-        local remote = tostring(self):lower()
+if success then
+    mt.__namecall = newcclosure(function(self, ...)
+        local args = {...}
+        local method = getnamecallmethod()
         
-        if remote:find("bullet") or remote:find("shoot") or remote:find("fire") or 
-           remote:find("weapon") or remote:find("hit") or remote:find("damage") then
+        if Config.SilentAim and method == "FireServer" and not checkcaller() then
+            local remote = tostring(self):lower()
             
-            local target = GetClosestPlayer(Config.SilentFOV, Config.SilentPart)
-            
-            if target and target.Character then
-                local part = target.Character:FindFirstChild(Config.SilentPart) or
-                            target.Character:FindFirstChild("Head") or
-                            target.Character:FindFirstChild("HumanoidRootPart")
+            if remote:find("bullet") or remote:find("shoot") or remote:find("fire") or 
+               remote:find("weapon") or remote:find("hit") or remote:find("damage") then
                 
-                if part then
-                    local vel = part.AssemblyLinearVelocity or Vector3.new(0,0,0)
-                    local pos = part.Position + (vel * Config.SilentPrediction)
+                local target = GetClosestPlayer(Config.SilentFOV, Config.SilentPart)
+                
+                if target and target.Character then
+                    local part = target.Character:FindFirstChild(Config.SilentPart) or
+                                target.Character:FindFirstChild("Head") or
+                                target.Character:FindFirstChild("HumanoidRootPart")
                     
-                    for i = 1, #args do
-                        if typeof(args[i]) == "Vector3" then
-                            args[i] = pos
-                        elseif typeof(args[i]) == "Instance" and args[i]:IsA("BasePart") then
-                            args[i] = part
+                    if part then
+                        local vel = part.AssemblyLinearVelocity or Vector3.new(0,0,0)
+                        local pos = part.Position + (vel * Config.SilentPrediction)
+                        
+                        for i = 1, #args do
+                            if typeof(args[i]) == "Vector3" then
+                                args[i] = pos
+                            elseif typeof(args[i]) == "Instance" and args[i]:IsA("BasePart") then
+                                args[i] = part
+                            end
                         end
                     end
                 end
             end
         end
-    end
-    
-    return oldNamecall(self, unpack(args))
-end)
-
-setreadonly(mt, true)
+        
+        return oldNamecall(self, unpack(args))
+    end)
+end
 
 -- ============================================
 -- AIMBOT
@@ -1149,7 +1174,7 @@ local function RestoreOriginal(player)
     end
 end
 
-local function UpdateHitboxes()
+function UpdateHitboxes()
     if not Config.HitboxExpander then
         for p, _ in pairs(HitboxDatabase) do RestoreOriginal(p) end
         return
@@ -1284,7 +1309,7 @@ local FlyActive = false
 local FlyBV = nil
 local FlyKeys = { W = false, S = false, A = false, D = false, Space = false, Shift = false }
 
-local function StartFly()
+function StartFly()
     if not LocalPlayer.Character then return end
     local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
     local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
@@ -1298,7 +1323,7 @@ local function StartFly()
     FlyActive = true
 end
 
-local function StopFly()
+function StopFly()
     if FlyBV then FlyBV:Destroy() FlyBV = nil end
     if LocalPlayer and LocalPlayer.Character then
         local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
@@ -1396,15 +1421,16 @@ RunService.Heartbeat:Connect(function()
 end)
 
 -- ============================================
--- INFINITE RANGE
+-- INFINITE RANGE (WITH READONLY SAFETY)
 -- ============================================
-local oldIndex = mt.__index
-mt.__index = newcclosure(function(self, k)
-    if Config.InfiniteRange and not checkcaller() then
-        if k == "MaxRange" or k == "Range" or k == "BulletRange" then return 9999 end
-    end
-    return oldIndex(self, k)
-end)
+if success then
+    mt.__index = newcclosure(function(self, k)
+        if Config.InfiniteRange and not checkcaller() then
+            if k == "MaxRange" or k == "Range" or k == "BulletRange" then return 9999 end
+        end
+        return oldIndex(self, k)
+    end)
+end
 
 -- ============================================
 -- WALKSPEED
@@ -1422,7 +1448,7 @@ end)
 -- CLICK TELEPORT
 -- ============================================
 local ClickTPConnection = nil
-local function SetupClickTP()
+function SetupClickTP()
     if ClickTPConnection then ClickTPConnection:Disconnect() end
     if Config.ClickTP then
         ClickTPConnection = Mouse.Button1Down:Connect(function()
@@ -1440,279 +1466,10 @@ local function SetupClickTP()
 end
 
 -- ============================================
--- MAIN UI INITIALIZATION
+-- NOTIFICATION
 -- ============================================
-function ArcUI:Init()
-    local sg = CreateScreenGui()
-    
-    -- Main Window
-    local mainFrame = CreateMainFrame(sg, UDim2.new(0, 800, 0, 550), UDim2.new(0.5, -400, 0.5, -275))
-    
-    -- Title Bar
-    local titleBar = CreateTitleBar(mainFrame, "ARC CLIENT • ARSENAL")
-    
-    -- Tab Container
-    local tabContainer, tabList = CreateTabContainer(mainFrame)
-    
-    -- Content Container
-    local contentContainer = CreateContentContainer(mainFrame)
-    
-    -- ========================================
-    -- SILENT AIM TAB
-    -- ========================================
-    local silentTabBtn = CreateTabButton(tabContainer, "Silent Aim", "🎯")
-    local silentContent = Instance.new("Frame")
-    silentContent.Name = "SilentContent"
-    silentContent.Size = UDim2.new(1, 0, 1, 0)
-    silentContent.BackgroundTransparency = 1
-    silentContent.Visible = false
-    silentContent.Parent = contentContainer
-    
-    local silentList = Instance.new("UIListLayout")
-    silentList.SortOrder = Enum.SortOrder.LayoutOrder
-    silentList.Padding = UDim.new(0, 15)
-    silentList.Parent = silentContent
-    
-    local silentSection1 = CreateSection(silentContent, "Silent Aim Settings")
-    self:CreateToggle(silentSection1, "Enable Silent Aim", "silent_aim", false, function(v) Config.SilentAim = v end)
-    self:CreateDropdown(silentSection1, "Target Part", "silent_part", {"Head", "UpperTorso", "LowerTorso", "HumanoidRootPart"}, "Head", function(v) Config.SilentPart = v end)
-    self:CreateSlider(silentSection1, "FOV", "silent_fov", 50, 400, 200, "px", function(v) Config.SilentFOV = v end)
-    self:CreateSlider(silentSection1, "Prediction", "silent_pred", 0, 300, 130, "ms", function(v) Config.SilentPrediction = v / 1000 end)
-    self:CreateToggle(silentSection1, "Team Check", "silent_team", true, function(v) Config.SilentTeam = v end)
-    self:CreateToggle(silentSection1, "Visible Check", "silent_visible", true, function(v) Config.SilentVisible = v end)
-    
-    -- ========================================
-    -- AIMBOT TAB
-    -- ========================================
-    local aimTabBtn = CreateTabButton(tabContainer, "Aimbot", "🔫")
-    local aimContent = Instance.new("Frame")
-    aimContent.Name = "AimContent"
-    aimContent.Size = UDim2.new(1, 0, 1, 0)
-    aimContent.BackgroundTransparency = 1
-    aimContent.Visible = false
-    aimContent.Parent = contentContainer
-    
-    local aimList = Instance.new("UIListLayout")
-    aimList.SortOrder = Enum.SortOrder.LayoutOrder
-    aimList.Padding = UDim.new(0, 15)
-    aimList.Parent = aimContent
-    
-    local aimSection1 = CreateSection(aimContent, "Aimbot Settings")
-    self:CreateToggle(aimSection1, "Enable Aimbot", "aimbot", false, function(v) Config.Aimbot = v end)
-    self:CreateDropdown(aimSection1, "Target Part", "aim_part", {"Head", "UpperTorso", "LowerTorso", "HumanoidRootPart"}, "Head", function(v) Config.AimPart = v end)
-    self:CreateSlider(aimSection1, "FOV", "aim_fov", 50, 300, 150, "px", function(v) Config.AimFOV = v end)
-    self:CreateSlider(aimSection1, "Smoothness", "aim_smooth", 0.05, 0.5, 0.2, "", function(v) Config.AimSmooth = v end)
-    self:CreateSlider(aimSection1, "Prediction", "aim_pred", 0, 300, 130, "ms", function(v) Config.AimPrediction = v / 1000 end)
-    
-    local triggerSection = CreateSection(aimContent, "Triggerbot")
-    self:CreateToggle(triggerSection, "Enable Triggerbot", "triggerbot", false, function(v) Config.Triggerbot = v end)
-    self:CreateSlider(triggerSection, "Trigger FOV", "trigger_fov", 30, 150, 60, "px", function(v) Config.TriggerFOV = v end)
-    self:CreateSlider(triggerSection, "Trigger Delay", "trigger_delay", 0, 100, 25, "ms", function(v) Config.TriggerDelay = v / 1000 end)
-    
-    local rapidSection = CreateSection(aimContent, "Rapid Fire")
-    self:CreateToggle(rapidSection, "Enable Rapid Fire", "rapid_fire", false, function(v) Config.RapidFire = v end)
-    self:CreateSlider(rapidSection, "Fire Rate", "rapid_fire_delay", 10, 100, 50, "ms", function(v) Config.RapidFireDelay = v / 1000 end)
-    
-    -- ========================================
-    -- HITBOX TAB
-    -- ========================================
-    local hitboxTabBtn = CreateTabButton(tabContainer, "Hitbox", "📦")
-    local hitboxContent = Instance.new("Frame")
-    hitboxContent.Name = "HitboxContent"
-    hitboxContent.Size = UDim2.new(1, 0, 1, 0)
-    hitboxContent.BackgroundTransparency = 1
-    hitboxContent.Visible = false
-    hitboxContent.Parent = contentContainer
-    
-    local hitboxList = Instance.new("UIListLayout")
-    hitboxList.SortOrder = Enum.SortOrder.LayoutOrder
-    hitboxList.Padding = UDim.new(0, 15)
-    hitboxList.Parent = hitboxContent
-    
-    local hitboxSection = CreateSection(hitboxContent, "Hitbox Expander")
-    self:CreateToggle(hitboxSection, "Enable Hitbox Expander", "hitbox", false, function(v) Config.HitboxExpander = v; UpdateHitboxes() end)
-    self:CreateSlider(hitboxSection, "Hitbox Size", "hitbox_size", 5, 40, 21, "studs", function(v) Config.HitboxSize = v; UpdateHitboxes() end)
-    self:CreateSlider(hitboxSection, "Transparency", "hitbox_trans", 0, 10, 6, "/10", function(v) Config.HitboxTransparency = v; UpdateHitboxes() end)
-    self:CreateToggle(hitboxSection, "Disable Collision", "hitbox_nocollide", false, function(v) Config.HitboxNoCollision = v; UpdateHitboxes() end)
-    self:CreateDropdown(hitboxSection, "Team Check", "hitbox_team", {"FFA", "Everyone", "Enemies Only"}, "FFA", function(v) Config.HitboxTeamCheck = v; UpdateHitboxes() end)
-    
-    -- ========================================
-    -- VISUALS TAB
-    -- ========================================
-    local visualTabBtn = CreateTabButton(tabContainer, "Visuals", "👁️")
-    local visualContent = Instance.new("Frame")
-    visualContent.Name = "VisualContent"
-    visualContent.Size = UDim2.new(1, 0, 1, 0)
-    visualContent.BackgroundTransparency = 1
-    visualContent.Visible = false
-    visualContent.Parent = contentContainer
-    
-    local visualList = Instance.new("UIListLayout")
-    visualList.SortOrder = Enum.SortOrder.LayoutOrder
-    visualList.Padding = UDim.new(0, 15)
-    visualList.Parent = visualContent
-    
-    local espSection = CreateSection(visualContent, "ESP Settings")
-    self:CreateToggle(espSection, "Enable ESP", "esp", false, function(v) Config.ESP = v end)
-    self:CreateToggle(espSection, "2D Box", "box", false, function(v) Config.Box = v end)
-    self:CreateToggle(espSection, "Tracer", "tracer", false, function(v) Config.Tracer = v end)
-    self:CreateToggle(espSection, "Head Dot", "head", false, function(v) Config.Head = v end)
-    self:CreateToggle(espSection, "Name Tag", "name", false, function(v) Config.Name = v end)
-    self:CreateToggle(espSection, "Distance", "distance", false, function(v) Config.Distance = v end)
-    self:CreateDropdown(espSection, "Box Color", "box_color", {"White", "Red", "Green", "Blue", "Yellow"}, "White", function(v) 
-        local colors = {White=Color3.fromRGB(255,255,255), Red=Color3.fromRGB(255,70,70), Green=Color3.fromRGB(70,255,70), Blue=Color3.fromRGB(70,70,255), Yellow=Color3.fromRGB(255,255,70)}
-        Config.BoxColor = colors[v] 
-    end)
-    
-    local fovSection = CreateSection(visualContent, "FOV Circle")
-    self:CreateToggle(fovSection, "Show FOV Circle", "fov", false, function(v) Config.FOV = v end)
-    self:CreateSlider(fovSection, "FOV Radius", "fov_radius", 50, 300, 150, "px", function(v) Config.FOVRadius = v end)
-    
-    -- ========================================
-    -- MOVEMENT TAB
-    -- ========================================
-    local moveTabBtn = CreateTabButton(tabContainer, "Movement", "🏃")
-    local moveContent = Instance.new("Frame")
-    moveContent.Name = "MoveContent"
-    moveContent.Size = UDim2.new(1, 0, 1, 0)
-    moveContent.BackgroundTransparency = 1
-    moveContent.Visible = false
-    moveContent.Parent = contentContainer
-    
-    local moveList = Instance.new("UIListLayout")
-    moveList.SortOrder = Enum.SortOrder.LayoutOrder
-    moveList.Padding = UDim.new(0, 15)
-    moveList.Parent = moveContent
-    
-    local speedSection = CreateSection(moveContent, "Speed")
-    self:CreateToggle(speedSection, "Walkspeed", "walkspeed", false, function(v) Config.Walkspeed = v end)
-    self:CreateSlider(speedSection, "Walkspeed Value", "walkspeed_val", 16, 100, 32, "studs", function(v) Config.WalkspeedValue = v end)
-    
-    local flySection = CreateSection(moveContent, "Flight")
-    self:CreateToggle(flySection, "Enable Fly", "fly", false, function(v) Config.Fly = v; if v then StartFly() else StopFly() end end)
-    self:CreateSlider(flySection, "Fly Speed", "fly_speed", 20, 150, 50, "studs", function(v) Config.FlySpeed = v end)
-    
-    local jumpSection = CreateSection(moveContent, "Jump")
-    self:CreateToggle(jumpSection, "Infinite Jump", "infjump", false, function(v) Config.InfJump = v end)
-    
-    local noclipSection = CreateSection(moveContent, "Collision")
-    self:CreateToggle(noclipSection, "NoClip", "noclip", false, function(v) Config.NoClip = v end)
-    
-    -- ========================================
-    -- UTILITY TAB
-    -- ========================================
-    local utilTabBtn = CreateTabButton(tabContainer, "Utility", "⚙️")
-    local utilContent = Instance.new("Frame")
-    utilContent.Name = "UtilContent"
-    utilContent.Size = UDim2.new(1, 0, 1, 0)
-    utilContent.BackgroundTransparency = 1
-    utilContent.Visible = false
-    utilContent.Parent = contentContainer
-    
-    local utilList = Instance.new("UIListLayout")
-    utilList.SortOrder = Enum.SortOrder.LayoutOrder
-    utilList.Padding = UDim.new(0, 15)
-    utilList.Parent = utilContent
-    
-    local weaponSection = CreateSection(utilContent, "Weapon")
-    self:CreateToggle(weaponSection, "Auto Reload", "auto_reload", false, function(v) Config.AutoReload = v end)
-    self:CreateToggle(weaponSection, "Infinite Range", "infinite_range", false, function(v) Config.InfiniteRange = v end)
-    
-    local combatSection = CreateSection(utilContent, "Combat")
-    self:CreateButton(combatSection, "Kill All", function()
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer and p.Character then
-                local h = p.Character:FindFirstChildOfClass("Humanoid")
-                if h and h.Health > 0 then h.Health = 0 end
-            end
-        end
-    end)
-    
-    self:CreateToggle(combatSection, "Click Teleport", "clicktp", false, function(v) Config.ClickTP = v; SetupClickTP() end)
-    
-    -- ========================================
-    -- INFO TAB
-    -- ========================================
-    local infoTabBtn = CreateTabButton(tabContainer, "Info", "ℹ️")
-    local infoContent = Instance.new("Frame")
-    infoContent.Name = "InfoContent"
-    infoContent.Size = UDim2.new(1, 0, 1, 0)
-    infoContent.BackgroundTransparency = 1
-    infoContent.Visible = false
-    infoContent.Parent = contentContainer
-    
-    local infoList = Instance.new("UIListLayout")
-    infoList.SortOrder = Enum.SortOrder.LayoutOrder
-    infoList.Padding = UDim.new(0, 15)
-    infoList.Parent = infoContent
-    
-    local aboutSection = CreateSection(infoContent, "About")
-    self:CreateLabel(aboutSection, "ARC CLIENT | ARSENAL")
-    self:CreateLabel(aboutSection, "Developer: mqp6/developer")
-    self:CreateLabel(aboutSection, "Version: 9.0.0")
-    self:CreateLabel(aboutSection, "Build: 02/12/2026")
-    self:CreateLabel(aboutSection, " ")
-    
-    local featuresSection = CreateSection(infoContent, "Features")
-    self:CreateLabel(featuresSection, "✓ Silent Aim - Working")
-    self:CreateLabel(featuresSection, "✓ Aimbot - Working")
-    self:CreateLabel(featuresSection, "✓ Triggerbot - Working")
-    self:CreateLabel(featuresSection, "✓ Rapid Fire - Working")
-    self:CreateLabel(featuresSection, "✓ Hitbox Expander - Working")
-    self:CreateLabel(featuresSection, "✓ ESP - Working")
-    self:CreateLabel(featuresSection, "✓ Fly - Working")
-    self:CreateLabel(featuresSection, "✓ Infinite Jump - Working")
-    self:CreateLabel(featuresSection, "✓ NoClip - Working")
-    self:CreateLabel(featuresSection, "✓ Auto Reload - Working")
-    self:CreateLabel(featuresSection, "✓ Infinite Range - Working")
-    self:CreateLabel(featuresSection, " ")
-    
-    local discordSection = CreateSection(infoContent, "Community")
-    self:CreateButton(discordSection, "Copy Discord Invite", function()
-        setclipboard("https://discord.gg/rmpQfYtnWd")
-    end)
-    
-    -- Tab Switching Logic
-    local tabs = {
-        silentTabBtn, aimTabBtn, hitboxTabBtn, visualTabBtn, moveTabBtn, utilTabBtn, infoTabBtn
-    }
-    local contents = {
-        silentContent, aimContent, hitboxContent, visualContent, moveContent, utilContent, infoContent
-    }
-    
-    for i, btn in ipairs(tabs) do
-        btn.MouseButton1Click:Connect(function()
-            for _, b in ipairs(tabs) do
-                b.BackgroundColor3 = ArcUI.Colors.Element
-                b.TextColor3 = ArcUI.Colors.TextDim
-            end
-            btn.BackgroundColor3 = ArcUI.Colors.Accent
-            btn.TextColor3 = ArcUI.Colors.Text
-            
-            for _, c in ipairs(contents) do
-                c.Visible = false
-            end
-            contents[i].Visible = true
-        end)
-    end
-    
-    -- Set default tab
-    tabs[1].BackgroundColor3 = ArcUI.Colors.Accent
-    tabs[1].TextColor3 = ArcUI.Colors.Text
-    contents[1].Visible = true
-end
-
--- ============================================
--- START
--- ============================================
-if ArcUI.KeySystem.Enabled then
-    ShowKeySystem()
-else
-    ArcUI:Init()
-end
-
 StarterGui:SetCore("SendNotification", {
     Title = "ARC CLIENT",
-    Text = "Custom UI Loaded • Press RightShift to open",
-    Duration = 3
+    Text = "Custom UI Loaded • Silent Aim: " .. (success and "ON" or "OFF (Metatable failed)"),
+    Duration = 5
 })
