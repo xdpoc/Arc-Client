@@ -1,12 +1,9 @@
--- Arc Client | Prison Life
--- Combat Edition v1.0.0
-
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Window = Rayfield:CreateWindow({
     Name = "Arc Client | Prison Life",
     LoadingTitle = "Arc Client",
-    LoadingSubtitle = "Combat Edition",
-    ConfigurationSaving = { Enabled = true, FolderName = "ArcClient", FileName = "CombatConfig" },
+    LoadingSubtitle = "Developed by @mqp6 on discord",
+    ConfigurationSaving = { Enabled = true, FolderName = "ArcClient", FileName = "EliteConfig" },
     KeySystem = false
 })
 
@@ -16,11 +13,11 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
-local CoreGui = game:GetService("CoreGui")
 local Teams = game:GetService("Teams")
 local HttpService = game:GetService("HttpService")
 local StarterGui = game:GetService("StarterGui")
-local Debris = game:GetService("Debris")
+local VirtualUser = game:GetService("VirtualUser")
+local TweenService = game:GetService("TweenService")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
@@ -29,80 +26,491 @@ local Guards = Teams:FindFirstChild("Guards")
 local Inmates = Teams:FindFirstChild("Inmates")
 local Criminals = Teams:FindFirstChild("Criminals")
 
--- Webhook Logger
-local WEBHOOK_URL = "https://discord.com/api/webhooks/1471881462616821881/_I3pQPKTvy18suk6QpXUIDisNfvYsuDCTN9HorR_lPJT74nHp-I9eiseJsTFwAJbBWa6"
+-- ============= GITHUB WHITELIST SYSTEM =============
+local OWNER_LIST_URL = "https://raw.githubusercontent.com/xdpoc/Arc-Client/refs/heads/main/whitelist"
 
-local function sendWebhook(data)
-    local payload = {
-        ["embeds"] = {{
-            ["title"] = "Arc Client Execution Log",
-            ["color"] = 16711680,
-            ["fields"] = {
-                {
-                    ["name"] = "Player",
-                    ["value"] = data.Player,
-                    ["inline"] = true
-                },
-                {
-                    ["name"] = "User ID",
-                    ["value"] = tostring(data.UserId),
-                    ["inline"] = true
-                },
-                {
-                    ["name"] = "Display Name",
-                    ["value"] = data.DisplayName,
-                    ["inline"] = true
-                },
-                {
-                    ["name"] = "Account Age",
-                    ["value"] = data.AccountAge .. " days",
-                    ["inline"] = true
-                },
-                {
-                    ["name"] = "Game",
-                    ["value"] = "Prison Life",
-                    ["inline"] = true
-                },
-                {
-                    ["name"] = "Job ID",
-                    ["value"] = "`" .. data.JobId .. "`",
-                    ["inline"] = true
-                },
-                {
-                    ["name"] = "Action",
-                    ["value"] = data.Action,
-                    ["inline"] = false
-                },
-                {
-                    ["name"] = "Time",
-                    ["value"] = os.date("%Y-%m-%d %H:%M:%S"),
-                    ["inline"] = false
-                }
-            },
-            ["footer"] = {
-                ["text"] = "Arc Client v1.0.0"
-            }
-        }}
-    }
+local OwnerSystem = {
+    IsOwner = false,
+    Owners = {},
+    LastChecked = 0,
+    CheckInterval = 300,
+    CacheTime = 60,
+}
 
-    local jsonData = HttpService:JSONEncode(payload)
-
+-- Function to fetch and verify owner status
+local function checkOwnerStatus()
+    local success = false
+    local currentUserId = LocalPlayer.UserId
+    
+    if OwnerSystem.LastChecked > 0 and (tick() - OwnerSystem.LastChecked) < OwnerSystem.CacheTime then
+        return OwnerSystem.IsOwner
+    end
+    
     pcall(function()
-        HttpService:PostAsync(WEBHOOK_URL, jsonData, Enum.HttpContentType.ApplicationJson)
+        local response = game:HttpGet(OWNER_LIST_URL, true)
+        local success, data = pcall(function()
+            return HttpService:JSONDecode(response)
+        end)
+        
+        if success and data and data.owners then
+            OwnerSystem.Owners = data.owners
+            for _, ownerId in ipairs(data.owners) do
+                if tonumber(ownerId) == currentUserId then
+                    OwnerSystem.IsOwner = true
+                    break
+                else
+                    OwnerSystem.IsOwner = false
+                end
+            end
+        else
+            for line in string.gmatch(response, "[^\r\n]+") do
+                local id = tonumber(string.match(line, "%d+"))
+                if id and id == currentUserId then
+                    OwnerSystem.IsOwner = true
+                    break
+                end
+            end
+        end
+        OwnerSystem.LastChecked = tick()
+        success = true
+    end)
+    
+    return OwnerSystem.IsOwner
+end
+
+-- Initial check
+checkOwnerStatus()
+
+-- Periodic checks
+task.spawn(function()
+    while true do
+        task.wait(OwnerSystem.CheckInterval)
+        checkOwnerStatus()
+    end
+end)
+
+-- ============= CHAT COMMAND SYSTEM =============
+local CommandSystem = {
+    Prefix = ".",  -- Command prefix
+    Commands = {},
+    Loops = {},
+    ActiveLoops = {}
+}
+
+-- Function to find player by name (partial matches allowed)
+local function findPlayer(name)
+    name = name:lower()
+    local bestMatch = nil
+    local bestLength = 0
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local playerName = player.Name:lower()
+            local displayName = player.DisplayName:lower()
+            
+            -- Check exact matches first
+            if playerName == name or displayName == name then
+                return player
+            end
+            
+            -- Check if name starts with the search term
+            if playerName:sub(1, #name) == name or displayName:sub(1, #name) == name then
+                if #name > bestLength then
+                    bestLength = #name
+                    bestMatch = player
+                end
+            end
+            
+            -- Check if name contains the search term
+            if playerName:find(name, 1, true) or displayName:find(name, 1, true) then
+                if #name > bestLength then
+                    bestLength = #name
+                    bestMatch = player
+                end
+            end
+        end
+    end
+    
+    return bestMatch
+end
+
+-- Function to send chat message
+local function sendChatMessage(message)
+    local args = {
+        [1] = message,
+        [2] = "All"
+    }
+    local chatEvent = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
+    if chatEvent then
+        local sayRequest = chatEvent:FindFirstChild("SayMessageRequest")
+        if sayRequest then
+            sayRequest:FireServer(unpack(args))
+        end
+    end
+end
+
+-- Function to kill player
+local function killPlayer(player)
+    if player and player.Character then
+        local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid.Health = 0
+            return true
+        end
+    end
+    return false
+end
+
+-- Function to fling player
+local function flingPlayer(player)
+    if player and player.Character then
+        local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            local bodyVelocity = Instance.new("BodyVelocity")
+            bodyVelocity.Velocity = Vector3.new(math.random(-1000, 1000), 1000, math.random(-1000, 1000))
+            bodyVelocity.MaxForce = Vector3.new(10000, 10000, 10000)
+            bodyVelocity.Parent = hrp
+            
+            task.delay(2, function()
+                if bodyVelocity then
+                    bodyVelocity:Destroy()
+                end
+            end)
+            return true
+        end
+    end
+    return false
+end
+
+-- Function to freeze player
+local function freezePlayer(player)
+    if player and player.Character then
+        local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            hrp.Anchored = true
+            return true
+        end
+    end
+    return false
+end
+
+-- Function to unfreeze player
+local function unfreezePlayer(player)
+    if player and player.Character then
+        local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            hrp.Anchored = false
+            return true
+        end
+    end
+    return false
+end
+
+-- Function to bring player
+local function bringPlayer(player)
+    if player and player.Character and LocalPlayer.Character then
+        local targetHrp = player.Character:FindFirstChild("HumanoidRootPart")
+        local myHrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if targetHrp and myHrp then
+            targetHrp.CFrame = myHrp.CFrame * CFrame.new(0, 0, -5)
+            return true
+        end
+    end
+    return false
+end
+
+-- Function to kick player
+local function kickPlayer(player, reason)
+    if player then
+        player:Kick(reason or "Kicked by Arc Client Owner")
+        return true
+    end
+    return false
+end
+
+-- Register commands
+CommandSystem.Commands = {
+    ["kill"] = function(args)
+        if #args < 1 then
+            sendChatMessage("Usage: .kill <player>")
+            return
+        end
+        local player = findPlayer(args[1])
+        if player then
+            if killPlayer(player) then
+                sendChatMessage("Killed " .. player.Name)
+            else
+                sendChatMessage("Failed to kill " .. args[1])
+            end
+        else
+            sendChatMessage("Player '" .. args[1] .. "' not found")
+        end
+    end,
+    
+    ["loopkill"] = function(args)
+        if #args < 1 then
+            sendChatMessage("Usage: .loopkill <player>")
+            return
+        end
+        local player = findPlayer(args[1])
+        if player then
+            if CommandSystem.ActiveLoops["kill_" .. player.Name] then
+                CommandSystem.ActiveLoops["kill_" .. player.Name] = false
+                sendChatMessage("Stopped loop kill on " .. player.Name)
+            else
+                CommandSystem.ActiveLoops["kill_" .. player.Name] = true
+                sendChatMessage("Started loop kill on " .. player.Name)
+                
+                task.spawn(function()
+                    while CommandSystem.ActiveLoops["kill_" .. player.Name] do
+                        if player and player.Character then
+                            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+                            if humanoid and humanoid.Health > 0 then
+                                humanoid.Health = 0
+                            end
+                        end
+                        task.wait(0.5)
+                    end
+                end)
+            end
+        else
+            sendChatMessage("Player '" .. args[1] .. "' not found")
+        end
+    end,
+    
+    ["killall"] = function()
+        local count = 0
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                if killPlayer(player) then
+                    count = count + 1
+                end
+            end
+        end
+        sendChatMessage("Killed " .. count .. " players")
+    end,
+    
+    ["fling"] = function(args)
+        if #args < 1 then
+            sendChatMessage("Usage: .fling <player>")
+            return
+        end
+        local player = findPlayer(args[1])
+        if player then
+            if flingPlayer(player) then
+                sendChatMessage("Flinged " .. player.Name)
+            else
+                sendChatMessage("Failed to fling " .. args[1])
+            end
+        else
+            sendChatMessage("Player '" .. args[1] .. "' not found")
+        end
+    end,
+    
+    ["loopfling"] = function(args)
+        if #args < 1 then
+            sendChatMessage("Usage: .loopfling <player>")
+            return
+        end
+        local player = findPlayer(args[1])
+        if player then
+            if CommandSystem.ActiveLoops["fling_" .. player.Name] then
+                CommandSystem.ActiveLoops["fling_" .. player.Name] = false
+                sendChatMessage("Stopped loop fling on " .. player.Name)
+            else
+                CommandSystem.ActiveLoops["fling_" .. player.Name] = true
+                sendChatMessage("Started loop fling on " .. player.Name)
+                
+                task.spawn(function()
+                    while CommandSystem.ActiveLoops["fling_" .. player.Name] do
+                        if player and player.Character then
+                            local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+                            if hrp then
+                                local bodyVelocity = Instance.new("BodyVelocity")
+                                bodyVelocity.Velocity = Vector3.new(math.random(-1000, 1000), 1000, math.random(-1000, 1000))
+                                bodyVelocity.MaxForce = Vector3.new(10000, 10000, 10000)
+                                bodyVelocity.Parent = hrp
+                                
+                                task.delay(1, function()
+                                    if bodyVelocity then
+                                        bodyVelocity:Destroy()
+                                    end
+                                end)
+                            end
+                        end
+                        task.wait(1)
+                    end
+                end)
+            end
+        else
+            sendChatMessage("Player '" .. args[1] .. "' not found")
+        end
+    end,
+    
+    ["freeze"] = function(args)
+        if #args < 1 then
+            sendChatMessage("Usage: .freeze <player>")
+            return
+        end
+        local player = findPlayer(args[1])
+        if player then
+            if freezePlayer(player) then
+                sendChatMessage("Froze " .. player.Name)
+            else
+                sendChatMessage("Failed to freeze " .. args[1])
+            end
+        else
+            sendChatMessage("Player '" .. args[1] .. "' not found")
+        end
+    end,
+    
+    ["unfreeze"] = function(args)
+        if #args < 1 then
+            sendChatMessage("Usage: .unfreeze <player>")
+            return
+        end
+        local player = findPlayer(args[1])
+        if player then
+            if unfreezePlayer(player) then
+                sendChatMessage("Unfroze " .. player.Name)
+            else
+                sendChatMessage("Failed to unfreeze " .. args[1])
+            end
+        else
+            sendChatMessage("Player '" .. args[1] .. "' not found")
+        end
+    end,
+    
+    ["bring"] = function(args)
+        if #args < 1 then
+            sendChatMessage("Usage: .bring <player>")
+            return
+        end
+        local player = findPlayer(args[1])
+        if player then
+            if bringPlayer(player) then
+                sendChatMessage("Brought " .. player.Name)
+            else
+                sendChatMessage("Failed to bring " .. args[1])
+            end
+        else
+            sendChatMessage("Player '" .. args[1] .. "' not found")
+        end
+    end,
+    
+    ["kick"] = function(args)
+        if #args < 1 then
+            sendChatMessage("Usage: .kick <player> [reason]")
+            return
+        end
+        local player = findPlayer(args[1])
+        if player then
+            local reason = table.concat(args, " ", 2)
+            if kickPlayer(player, reason) then
+                sendChatMessage("Kicked " .. player.Name)
+            else
+                sendChatMessage("Failed to kick " .. args[1])
+            end
+        else
+            sendChatMessage("Player '" .. args[1] .. "' not found")
+        end
+    end,
+    
+    ["view"] = function(args)
+        if #args < 1 then
+            sendChatMessage("Usage: .view <player>")
+            return
+        end
+        local player = findPlayer(args[1])
+        if player and player.Character then
+            local head = player.Character:FindFirstChild("Head")
+            if head then
+                Camera.CFrame = CFrame.new(Camera.CFrame.Position, head.Position)
+                sendChatMessage("Now viewing " .. player.Name)
+            end
+        else
+            sendChatMessage("Player '" .. args[1] .. "' not found")
+        end
+    end,
+    
+    ["stop"] = function(args)
+        if #args < 1 then
+            -- Stop all loops
+            for loopName, _ in pairs(CommandSystem.ActiveLoops) do
+                CommandSystem.ActiveLoops[loopName] = false
+            end
+            sendChatMessage("Stopped all loops")
+        else
+            local player = findPlayer(args[1])
+            if player then
+                if CommandSystem.ActiveLoops["kill_" .. player.Name] then
+                    CommandSystem.ActiveLoops["kill_" .. player.Name] = false
+                end
+                if CommandSystem.ActiveLoops["fling_" .. player.Name] then
+                    CommandSystem.ActiveLoops["fling_" .. player.Name] = false
+                end
+                sendChatMessage("Stopped all loops on " .. player.Name)
+            else
+                sendChatMessage("Player '" .. args[1] .. "' not found")
+            end
+        end
+    end,
+    
+    ["help"] = function()
+        sendChatMessage("Commands: .kill, .loopkill, .killall, .fling, .loopfling, .freeze, .unfreeze, .bring, .kick, .view, .stop")
+    end
+}
+
+-- Chat listener
+local function onChatMessage(message)
+    if not OwnerSystem.IsOwner then return end
+    
+    if message:sub(1, 1) == CommandSystem.Prefix then
+        -- Remove prefix and split
+        local commandText = message:sub(2)
+        local args = {}
+        for word in string.gmatch(commandText, "%S+") do
+            table.insert(args, word)
+        end
+        
+        if #args > 0 then
+            local commandName = args[1]:lower()
+            table.remove(args, 1)
+            
+            local command = CommandSystem.Commands[commandName]
+            if command then
+                pcall(function()
+                    command(args)
+                end)
+            end
+        end
+    end
+end
+
+-- Connect to chat
+local function setupChatListener()
+    -- Method 1: Standard Roblox chat
+    local chatFolder = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
+    if chatFolder then
+        local messageEvent = chatFolder:FindFirstChild("OnMessageDoneFiltering")
+        if messageEvent then
+            messageEvent.OnClientEvent:Connect(function(messageData)
+                if messageData and messageData.Message then
+                    onChatMessage(messageData.Message)
+                end
+            end)
+        end
+    end
+    
+    -- Method 2: Alternative chat system
+    LocalPlayer.Chatted:Connect(function(message)
+        onChatMessage(message)
     end)
 end
 
--- Send execution log
-sendWebhook({
-    Player = LocalPlayer.Name,
-    UserId = LocalPlayer.UserId,
-    DisplayName = LocalPlayer.DisplayName,
-    AccountAge = LocalPlayer.AccountAge,
-    JobId = game.JobId,
-    Action = "Script Executed"
-})
+setupChatListener()
 
--- Configuration (ALL FALSE)
+-- Configuration
 local Config = {
     Enabled = false,
     TeamCheck = false,
@@ -137,82 +545,122 @@ local Config = {
     TargetStickinessRandom = false,
     TargetStickinessMin = 0.3,
     TargetStickinessMax = 0.7,
-    FOV = 100,
+    FOV = 150,
     ShowFOV = false,
     ShowTargetLine = false,
     ToggleKey = Enum.KeyCode.RightShift,
     AimPart = "Head",
     RandomParts = false,
     PartsList = {"Head", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg", "HumanoidRootPart"},
+    
+    -- ESP Settings
+    ESP = {
+        Enabled = false,
+        Box = false,
+        Name = false,
+        Health = false,
+        Distance = false,
+        Tracer = false,
+        TeamColors = true,
+        MaxDistance = 1000,
+        TracerStartPoint = "Head",
+    }
 }
 
--- Tabs
+-- ============= CREATE NEW TABS =============
 local MainTab = Window:CreateTab("Main", 4483362458)
-local AimTab = Window:CreateTab("Aim", 4483362458)
-local TargetingTab = Window:CreateTab("Targeting", 4483362458)
-local HitTab = Window:CreateTab("Hit Chance", 4483362458)
-local AutoTab = Window:CreateTab("Auto", 4483362458)
-local ShieldTab = Window:CreateTab("Shield", 4483362458)
-local TaserTab = Window:CreateTab("Taser", 4483362458)
-local PrisonTab = Window:CreateTab("Prison Life", 4483362458)
+local RageTab = Window:CreateTab("Rage", 4483362458)
+local VisualsTab = Window:CreateTab("Visuals", 4483362458)
+local MiscTab = Window:CreateTab("Misc", 4483362458)
 local SettingsTab = Window:CreateTab("Settings", 4483362458)
 
--- Main Tab
+-- ============= MAIN TAB =============
+local MainSection = MainTab:CreateSection("Aimbot Settings")
+
 MainTab:CreateToggle({ Name = "Enable Script", CurrentValue = false, Flag = "Enabled", Callback = function(v) Config.Enabled = v end })
-MainTab:CreateToggle({ Name = "Show FOV", CurrentValue = false, Flag = "ShowFOV", Callback = function(v) Config.ShowFOV = v end })
-MainTab:CreateToggle({ Name = "Show Target Line", CurrentValue = false, Flag = "ShowTargetLine", Callback = function(v) Config.ShowTargetLine = v end })
-MainTab:CreateSlider({ Name = "FOV Size", Range = {50, 500}, Increment = 5, CurrentValue = 150, Flag = "FOV", Callback = function(v) Config.FOV = v end })
+MainTab:CreateToggle({ Name = "Team Check", CurrentValue = false, Flag = "TeamCheck", Callback = function(v) Config.TeamCheck = v end })
+MainTab:CreateToggle({ Name = "Wall Check", CurrentValue = false, Flag = "WallCheck", Callback = function(v) Config.WallCheck = v end })
+MainTab:CreateToggle({ Name = "Death Check", CurrentValue = false, Flag = "DeathCheck", Callback = function(v) Config.DeathCheck = v end })
+MainTab:CreateToggle({ Name = "Forcefield Check", CurrentValue = false, Flag = "ForcefieldCheck", Callback = function(v) Config.ForcefieldCheck = v end })
+MainTab:CreateToggle({ Name = "Vehicle Check", CurrentValue = false, Flag = "VehicleCheck", Callback = function(v) Config.VehicleCheck = v end })
+
 MainTab:CreateDropdown({ Name = "Aim Part", Options = {"Head", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg", "HumanoidRootPart"}, CurrentOption = "Head", Flag = "AimPart", Callback = function(v) Config.AimPart = v end })
 MainTab:CreateToggle({ Name = "Random Parts", CurrentValue = false, Flag = "RandomParts", Callback = function(v) Config.RandomParts = v end })
 
--- Aim Tab
-AimTab:CreateToggle({ Name = "Team Check", CurrentValue = false, Flag = "TeamCheck", Callback = function(v) Config.TeamCheck = v end })
-AimTab:CreateToggle({ Name = "Wall Check", CurrentValue = false, Flag = "WallCheck", Callback = function(v) Config.WallCheck = v end })
-AimTab:CreateToggle({ Name = "Death Check", CurrentValue = false, Flag = "DeathCheck", Callback = function(v) Config.DeathCheck = v end })
-AimTab:CreateToggle({ Name = "Forcefield Check", CurrentValue = false, Flag = "ForcefieldCheck", Callback = function(v) Config.ForcefieldCheck = v end })
-AimTab:CreateToggle({ Name = "Vehicle Check", CurrentValue = false, Flag = "VehicleCheck", Callback = function(v) Config.VehicleCheck = v end })
+-- ============= RAGE TAB =============
+local RageSection = RageTab:CreateSection("Rage Settings")
 
--- Targeting Tab
-TargetingTab:CreateToggle({ Name = "Prioritize Closest", CurrentValue = false, Flag = "PrioritizeClosest", Callback = function(v) Config.PrioritizeClosest = v end })
-TargetingTab:CreateToggle({ Name = "Target Stickiness", CurrentValue = false, Flag = "TargetStickiness", Callback = function(v) Config.TargetStickiness = v end })
-TargetingTab:CreateSlider({ Name = "Stickiness Duration", Range = {0.1, 2}, Increment = 0.1, CurrentValue = 0.6, Flag = "StickinessDuration", Callback = function(v) Config.TargetStickinessDuration = v end })
-TargetingTab:CreateToggle({ Name = "Random Stickiness", CurrentValue = false, Flag = "StickinessRandom", Callback = function(v) Config.TargetStickinessRandom = v end })
-TargetingTab:CreateSlider({ Name = "Stickiness Min", Range = {0.1, 1}, Increment = 0.1, CurrentValue = 0.3, Flag = "StickinessMin", Callback = function(v) Config.TargetStickinessMin = v end })
-TargetingTab:CreateSlider({ Name = "Stickiness Max", Range = {0.1, 2}, Increment = 0.1, CurrentValue = 0.7, Flag = "StickinessMax", Callback = function(v) Config.TargetStickinessMax = v end })
+RageTab:CreateSlider({ Name = "Hitchance", Range = {0, 100}, Increment = 1, CurrentValue = 0, Flag = "Hitchance", Callback = function(v) Config.Hitchance = v end })
+RageTab:CreateSlider({ Name = "Miss Spread", Range = {0, 20}, Increment = 1, CurrentValue = 0, Flag = "MissSpread", Callback = function(v) Config.MissSpread = v end })
+RageTab:CreateToggle({ Name = "Auto Shoot", CurrentValue = false, Flag = "AutoShoot", Callback = function(v) Config.AutoShoot = v end })
+RageTab:CreateSlider({ Name = "Auto Shoot Delay", Range = {0.05, 0.5}, Increment = 0.01, CurrentValue = 0.12, Flag = "AutoShootDelay", Callback = function(v) Config.AutoShootDelay = v end })
 
--- Hit Tab
-HitTab:CreateSlider({ Name = "Hitchance", Range = {0, 100}, Increment = 1, CurrentValue = 0, Flag = "Hitchance", Callback = function(v) Config.Hitchance = v end })
-HitTab:CreateToggle({ Name = "Auto Only", CurrentValue = false, Flag = "HitchanceAutoOnly", Callback = function(v) Config.HitchanceAutoOnly = v end })
-HitTab:CreateSlider({ Name = "Miss Spread", Range = {0, 20}, Increment = 1, CurrentValue = 0, Flag = "MissSpread", Callback = function(v) Config.MissSpread = v end })
-HitTab:CreateToggle({ Name = "If Player Still", CurrentValue = false, Flag = "IfPlayerStill", Callback = function(v) Config.IfPlayerStill = v end })
-HitTab:CreateSlider({ Name = "Still Threshold", Range = {0.1, 2}, Increment = 0.1, CurrentValue = 0.5, Flag = "StillThreshold", Callback = function(v) Config.StillThreshold = v end })
+RageTab:CreateToggle({ Name = "Prioritize Closest", CurrentValue = false, Flag = "PrioritizeClosest", Callback = function(v) Config.PrioritizeClosest = v end })
+RageTab:CreateToggle({ Name = "Target Stickiness", CurrentValue = false, Flag = "TargetStickiness", Callback = function(v) Config.TargetStickiness = v end })
+RageTab:CreateSlider({ Name = "Stickiness Duration", Range = {0.1, 2}, Increment = 0.1, CurrentValue = 0.6, Flag = "StickinessDuration", Callback = function(v) Config.TargetStickinessDuration = v end })
 
--- Auto Tab
-AutoTab:CreateToggle({ Name = "Auto Shoot", CurrentValue = false, Flag = "AutoShoot", Callback = function(v) Config.AutoShoot = v end })
-AutoTab:CreateSlider({ Name = "Auto Shoot Delay", Range = {0.05, 0.5}, Increment = 0.01, CurrentValue = 0.12, Flag = "AutoShootDelay", Callback = function(v) Config.AutoShootDelay = v end })
-AutoTab:CreateSlider({ Name = "Start Delay", Range = {0, 0.5}, Increment = 0.01, CurrentValue = 0.2, Flag = "AutoShootStartDelay", Callback = function(v) Config.AutoShootStartDelay = v end })
+RageTab:CreateToggle({ Name = "Shield Breaker", CurrentValue = false, Flag = "ShieldBreaker", Callback = function(v) Config.ShieldBreaker = v end })
+RageTab:CreateSlider({ Name = "Shield Front Angle", Range = {0.1, 1}, Increment = 0.1, CurrentValue = 0.3, Flag = "ShieldFrontAngle", Callback = function(v) Config.ShieldFrontAngle = v end })
+RageTab:CreateToggle({ Name = "Taser Always Hit", CurrentValue = false, Flag = "TaserAlwaysHit", Callback = function(v) Config.TaserAlwaysHit = v end })
 
--- Shield Tab
-ShieldTab:CreateToggle({ Name = "Shield Breaker", CurrentValue = false, Flag = "ShieldBreaker", Callback = function(v) Config.ShieldBreaker = v end })
-ShieldTab:CreateSlider({ Name = "Shield Front Angle", Range = {0.1, 1}, Increment = 0.1, CurrentValue = 0.3, Flag = "ShieldFrontAngle", Callback = function(v) Config.ShieldFrontAngle = v end })
-ShieldTab:CreateToggle({ Name = "Random Headshots", CurrentValue = false, Flag = "ShieldRandomHead", Callback = function(v) Config.ShieldRandomHead = v end })
-ShieldTab:CreateSlider({ Name = "Headshot Chance", Range = {0, 100}, Increment = 1, CurrentValue = 0, Flag = "ShieldHeadChance", Callback = function(v) Config.ShieldHeadChance = v end })
+-- ============= VISUALS TAB =============
+local VisualsSection = VisualsTab:CreateSection("ESP Settings")
 
--- Taser Tab
-TaserTab:CreateToggle({ Name = "Taser Always Hit", CurrentValue = false, Flag = "TaserAlwaysHit", Callback = function(v) Config.TaserAlwaysHit = v end })
-TaserTab:CreateToggle({ Name = "Bypass Hostile Check", CurrentValue = false, Flag = "TaserBypassHostile", Callback = function(v) Config.TaserBypassHostile = v end })
-TaserTab:CreateToggle({ Name = "Bypass Trespass Check", CurrentValue = false, Flag = "TaserBypassTrespass", Callback = function(v) Config.TaserBypassTrespass = v end })
+VisualsTab:CreateToggle({ Name = "Enable ESP", CurrentValue = false, Flag = "ESP_Enabled", Callback = function(v) Config.ESP.Enabled = v end })
+VisualsTab:CreateToggle({ Name = "2D Box", CurrentValue = false, Flag = "ESP_Box", Callback = function(v) Config.ESP.Box = v end })
+VisualsTab:CreateToggle({ Name = "Show Names", CurrentValue = false, Flag = "ESP_Name", Callback = function(v) Config.ESP.Name = v end })
+VisualsTab:CreateToggle({ Name = "Show Health", CurrentValue = false, Flag = "ESP_Health", Callback = function(v) Config.ESP.Health = v end })
+VisualsTab:CreateToggle({ Name = "Show Distance", CurrentValue = false, Flag = "ESP_Distance", Callback = function(v) Config.ESP.Distance = v end })
+VisualsTab:CreateToggle({ Name = "Show Tracers", CurrentValue = false, Flag = "ESP_Tracer", Callback = function(v) Config.ESP.Tracer = v end })
+VisualsTab:CreateToggle({ Name = "Team Colors", CurrentValue = true, Flag = "ESP_TeamColors", Callback = function(v) Config.ESP.TeamColors = v end })
+VisualsTab:CreateSlider({ Name = "Max Distance", Range = {100, 2000}, Increment = 100, CurrentValue = 1000, Flag = "ESP_MaxDistance", Callback = function(v) Config.ESP.MaxDistance = v end })
 
--- Prison Tab
-PrisonTab:CreateToggle({ Name = "Hostile Check", CurrentValue = false, Flag = "HostileCheck", Callback = function(v) Config.HostileCheck = v end })
-PrisonTab:CreateToggle({ Name = "Trespass Check", CurrentValue = false, Flag = "TrespassCheck", Callback = function(v) Config.TrespassCheck = v end })
-PrisonTab:CreateToggle({ Name = "Criminals Don't Shoot Inmates", CurrentValue = false, Flag = "CriminalsNoInmates", Callback = function(v) Config.CriminalsNoInmates = v end })
-PrisonTab:CreateToggle({ Name = "Inmates Don't Shoot Criminals", CurrentValue = false, Flag = "InmatesNoCriminals", Callback = function(v) Config.InmatesNoCriminals = v end })
+VisualsTab:CreateDropdown({ 
+    Name = "Tracer Start Point", 
+    Options = {"Head", "Center Screen"}, 
+    CurrentOption = "Head", 
+    Flag = "ESP_TracerStart", 
+    Callback = function(v) 
+        Config.ESP.TracerStartPoint = v == "Head" and "Head" or "Center" 
+    end 
+})
 
--- Settings Tab
+VisualsTab:CreateToggle({ Name = "Show FOV Circle", CurrentValue = false, Flag = "ShowFOV", Callback = function(v) Config.ShowFOV = v end })
+VisualsTab:CreateToggle({ Name = "Show Target Line", CurrentValue = false, Flag = "ShowTargetLine", Callback = function(v) Config.ShowTargetLine = v end })
+VisualsTab:CreateSlider({ Name = "FOV Size", Range = {50, 500}, Increment = 5, CurrentValue = 150, Flag = "FOV", Callback = function(v) Config.FOV = v end })
+
+-- ============= MISC TAB =============
+local MiscSection = MiscTab:CreateSection("Prison Life Settings")
+
+MiscTab:CreateToggle({ Name = "Hostile Check", CurrentValue = false, Flag = "HostileCheck", Callback = function(v) Config.HostileCheck = v end })
+MiscTab:CreateToggle({ Name = "Trespass Check", CurrentValue = false, Flag = "TrespassCheck", Callback = function(v) Config.TrespassCheck = v end })
+MiscTab:CreateToggle({ Name = "Criminals Don't Shoot Inmates", CurrentValue = false, Flag = "CriminalsNoInmates", Callback = function(v) Config.CriminalsNoInmates = v end })
+MiscTab:CreateToggle({ Name = "Inmates Don't Shoot Criminals", CurrentValue = false, Flag = "InmatesNoCriminals", Callback = function(v) Config.InmatesNoCriminals = v end })
+
+-- ============= OWNER INFO SECTION =============
+local OwnerInfoSection = MiscTab:CreateSection("Owner Information")
+
+if OwnerSystem.IsOwner then
+    MiscTab:CreateLabel("Status: VERIFIED OWNER ✓")
+    MiscTab:CreateLabel("User ID: " .. LocalPlayer.UserId)
+    MiscTab:CreateLabel("Commands Prefix: '.'")
+    MiscTab:CreateLabel("Type .help in chat for commands")
+else
+    MiscTab:CreateLabel("Status: Not Authorized")
+    MiscTab:CreateLabel("Owner commands are locked")
+end
+
+-- ============= SETTINGS TAB =============
+local SettingsSection = SettingsTab:CreateSection("Settings")
+
 SettingsTab:CreateKeybind({ Name = "Toggle Script", CurrentKeybind = "RightShift", Flag = "ToggleKey", Callback = function(k) Config.ToggleKey = k end })
 
--- Original Variables
+SettingsTab:CreateButton({ Name = "Recheck Owner Status", Callback = function()
+    OwnerSystem.LastChecked = 0
+    checkOwnerStatus()
+end })
+
+-- ============= VARIABLES =============
 local currentGun = nil
 local rng = Random.new()
 local lastShotTime = 0
@@ -228,7 +676,13 @@ local lastGun = nil
 local origCastRay = nil
 local hooked = false
 
--- FOV Circle (CENTER SCREEN - CAN'T MOVE)
+-- TARGET CACHE
+local lastValidTarget = nil
+local lastTargetPos = nil
+local targetSmoothTime = 0
+local targetSmoothDelay = 0.1
+
+-- ============= DRAWING OBJECTS =============
 local fovCircle = Drawing.new("Circle")
 fovCircle.Color = Color3.fromRGB(255, 255, 255)
 fovCircle.Radius = Config.FOV
@@ -243,14 +697,258 @@ Camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
     fovCircle.Position = Camera.ViewportSize / 2
 end)
 
--- Target Line (WHITE)
 local targetLine = Drawing.new("Line")
 targetLine.Color = Color3.fromRGB(255, 255, 255)
-targetLine.Thickness = 1
+targetLine.Thickness = 2
 targetLine.Transparency = 0.5
 targetLine.Visible = false
 
--- Part Map
+-- ============= 60FPS ESP SYSTEM =============
+local ESP = {
+    Objects = {},
+    UpdateRate = 0.016,
+    LastUpdate = 0,
+    ViewportSize = Camera.ViewportSize,
+    CameraPos = Vector3.new(0,0,0)
+}
+
+local TeamColors = {
+    [Guards] = Color3.fromRGB(0, 150, 255),
+    [Criminals] = Color3.fromRGB(255, 50, 50),
+    [Inmates] = Color3.fromRGB(255, 165, 0),
+}
+
+local healthColorCache = {
+    [1] = Color3.fromRGB(0, 255, 0),
+    [2] = Color3.fromRGB(255, 255, 0),
+    [3] = Color3.fromRGB(255, 0, 0)
+}
+
+local function getHealthColor(health, maxHealth)
+    local percent = health / maxHealth
+    if percent > 0.6 then
+        return healthColorCache[1]
+    elseif percent > 0.3 then
+        return healthColorCache[2]
+    else
+        return healthColorCache[3]
+    end
+end
+
+local function formatDistance(dist)
+    return string.format("%.0fm", dist)
+end
+
+local function formatHealth(health)
+    return string.format("%.0f HP", health)
+end
+
+local function createESP(player)
+    if ESP.Objects[player] then return end
+    
+    ESP.Objects[player] = {
+        Box = Drawing.new("Square"),
+        Name = Drawing.new("Text"),
+        Health = Drawing.new("Text"),
+        Distance = Drawing.new("Text"),
+        Tracer = Drawing.new("Line"),
+        Active = false
+    }
+    
+    local obj = ESP.Objects[player]
+    
+    obj.Box.Visible = false
+    obj.Box.Thickness = 1
+    obj.Box.Transparency = 0.7
+    obj.Box.Filled = false
+    obj.Box.Color = Color3.fromRGB(255, 255, 255)
+    
+    obj.Name.Visible = false
+    obj.Name.Size = 13
+    obj.Name.Center = true
+    obj.Name.Outline = true
+    obj.Name.Font = 2
+    obj.Name.Color = Color3.fromRGB(255, 255, 255)
+    
+    obj.Health.Visible = false
+    obj.Health.Size = 11
+    obj.Health.Center = true
+    obj.Health.Outline = true
+    obj.Health.Font = 2
+    obj.Health.Color = Color3.fromRGB(0, 255, 0)
+    
+    obj.Distance.Visible = false
+    obj.Distance.Size = 11
+    obj.Distance.Center = true
+    obj.Distance.Outline = true
+    obj.Distance.Font = 2
+    obj.Distance.Color = Color3.fromRGB(255, 255, 255)
+    
+    obj.Tracer.Visible = false
+    obj.Tracer.Thickness = 1
+    obj.Tracer.Transparency = 0.7
+    obj.Tracer.Color = Color3.fromRGB(255, 255, 255)
+end
+
+local function hideESP(player)
+    local obj = ESP.Objects[player]
+    if not obj then return end
+    
+    obj.Box.Visible = false
+    obj.Name.Visible = false
+    obj.Health.Visible = false
+    obj.Distance.Visible = false
+    obj.Tracer.Visible = false
+    obj.Active = false
+end
+
+local function shouldShowESP(player)
+    if player == LocalPlayer then return false end
+    if not player.Character then return false end
+    
+    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+    if not humanoid or humanoid.Health <= 0 then return false end
+    
+    local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+    
+    local distance = (ESP.CameraPos - hrp.Position).Magnitude
+    if distance > Config.ESP.MaxDistance then return false end
+    
+    return true
+end
+
+local function updateESP()
+    if not Config.ESP.Enabled then
+        for player, obj in pairs(ESP.Objects) do
+            if obj.Active then
+                hideESP(player)
+            end
+        end
+        return
+    end
+    
+    ESP.ViewportSize = Camera.ViewportSize
+    ESP.CameraPos = Camera.CFrame.Position
+    
+    local viewportSize = ESP.ViewportSize
+    local tracerStartPos
+    
+    if Config.ESP.TracerStartPoint == "Head" then
+        tracerStartPos = Vector2.new(viewportSize.X / 2, viewportSize.Y / 3)
+    else
+        tracerStartPos = Vector2.new(viewportSize.X / 2, viewportSize.Y / 2)
+    end
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if shouldShowESP(player) then
+            if not ESP.Objects[player] then
+                createESP(player)
+            end
+            
+            local obj = ESP.Objects[player]
+            local char = player.Character
+            local humanoid = char:FindFirstChildOfClass("Humanoid")
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            
+            if hrp and humanoid then
+                local head = char:FindFirstChild("Head")
+                local headPos = head and head.Position or (hrp.Position + Vector3.new(0, 2.5, 0))
+                local footPos = hrp.Position - Vector3.new(0, 3, 0)
+                
+                local headScreen, headVisible = Camera:WorldToViewportPoint(headPos)
+                local footScreen, footVisible = Camera:WorldToViewportPoint(footPos)
+                
+                if headVisible and footVisible and headScreen.Z > 0 then
+                    local boxHeight = math.abs(headScreen.Y - footScreen.Y)
+                    local boxWidth = boxHeight * 0.6
+                    local boxX = headScreen.X - boxWidth / 2
+                    local boxY = headScreen.Y
+                    
+                    local color
+                    if Config.ESP.TeamColors and TeamColors[player.Team] then
+                        color = TeamColors[player.Team]
+                    else
+                        color = Color3.fromRGB(255, 255, 255)
+                    end
+                    
+                    local distance = (ESP.CameraPos - hrp.Position).Magnitude
+                    
+                    obj.Active = true
+                    
+                    if Config.ESP.Box then
+                        obj.Box.Visible = true
+                        obj.Box.Color = color
+                        obj.Box.Position = Vector2.new(boxX, boxY)
+                        obj.Box.Size = Vector2.new(boxWidth, boxHeight)
+                    else
+                        obj.Box.Visible = false
+                    end
+                    
+                    if Config.ESP.Name then
+                        obj.Name.Visible = true
+                        obj.Name.Color = color
+                        obj.Name.Text = player.Name
+                        obj.Name.Position = Vector2.new(headScreen.X, boxY - 15)
+                    else
+                        obj.Name.Visible = false
+                    end
+                    
+                    if Config.ESP.Health then
+                        obj.Health.Visible = true
+                        obj.Health.Color = getHealthColor(humanoid.Health, humanoid.MaxHealth)
+                        obj.Health.Text = formatHealth(humanoid.Health)
+                        obj.Health.Position = Vector2.new(headScreen.X, boxY + boxHeight + 2)
+                    else
+                        obj.Health.Visible = false
+                    end
+                    
+                    if Config.ESP.Distance then
+                        obj.Distance.Visible = true
+                        obj.Distance.Text = formatDistance(distance)
+                        obj.Distance.Position = Vector2.new(headScreen.X, boxY + boxHeight + 15)
+                    else
+                        obj.Distance.Visible = false
+                    end
+                    
+                    if Config.ESP.Tracer then
+                        obj.Tracer.Visible = true
+                        obj.Tracer.Color = color
+                        obj.Tracer.From = tracerStartPos
+                        obj.Tracer.To = Vector2.new(footScreen.X, footScreen.Y)
+                    else
+                        obj.Tracer.Visible = false
+                    end
+                else
+                    if obj.Active then
+                        hideESP(player)
+                    end
+                end
+            else
+                if obj.Active then
+                    hideESP(player)
+                end
+            end
+        else
+            if ESP.Objects[player] and ESP.Objects[player].Active then
+                hideESP(player)
+            end
+        end
+    end
+    
+    for player, obj in pairs(ESP.Objects) do
+        if not Players:FindFirstChild(player.Name) then
+            obj.Box:Remove()
+            obj.Name:Remove()
+            obj.Health:Remove()
+            obj.Distance:Remove()
+            obj.Tracer:Remove()
+            ESP.Objects[player] = nil
+        end
+    end
+end
+
+-- ============= AIMBOT FUNCTIONS =============
 local partMap = {
     ["Torso"] = {"Torso", "UpperTorso", "LowerTorso"},
     ["Left Arm"] = {"Left Arm", "LeftUpperArm", "LeftLowerArm", "LeftHand"},
@@ -259,14 +957,6 @@ local partMap = {
     ["Right Leg"] = {"Right Leg", "RightUpperLeg", "RightLowerLeg", "RightFoot"}
 }
 
--- Raycast Params
-local wallParams = RaycastParams.new()
-wallParams.FilterType = Enum.RaycastFilterType.Exclude
-wallParams.IgnoreWater = true
-wallParams.RespectCanCollide = false
-wallParams.CollisionGroup = "ClientBullet"
-
--- Utility Functions
 local function getPart(char, name)
     if not char then return nil end
     local p = char:FindFirstChild(name)
@@ -346,6 +1036,11 @@ local function isInVehicle(player)
     return humanoid.SeatPart ~= nil
 end
 
+local wallParams = RaycastParams.new()
+wallParams.FilterType = Enum.RaycastFilterType.Exclude
+wallParams.IgnoreWater = true
+wallParams.FilterDescendantsInstances = {LocalPlayer.Character}
+
 local function wallBetween(startPos, endPos, targetChar)
     local myChar = LocalPlayer.Character
     if not myChar then return true end
@@ -354,27 +1049,8 @@ local function wallBetween(startPos, endPos, targetChar)
     if targetChar then table.insert(filter, targetChar) end
     wallParams.FilterDescendantsInstances = filter
     
-    local direction = endPos - startPos
-    local distance = direction.Magnitude
-    local unit = direction.Unit
-    
-    local currentStart = startPos
-    local remaining = distance
-    
-    for _ = 1, 10 do
-        local result = Workspace:Raycast(currentStart, unit * remaining, wallParams)
-        if not result then return false end
-        
-        local hit = result.Instance
-        if hit.Transparency < 0.8 and hit.CanCollide then return true end
-        
-        local hitDist = (result.Position - currentStart).Magnitude
-        remaining = remaining - hitDist - 0.01
-        if remaining <= 0 then return false end
-        
-        currentStart = result.Position + unit * 0.01
-    end
-    return false
+    local result = Workspace:Raycast(startPos, (endPos - startPos).Unit * (endPos - startPos).Magnitude, wallParams)
+    return result ~= nil
 end
 
 local function quickCheck(player)
@@ -384,34 +1060,8 @@ local function quickCheck(player)
     if Config.ForcefieldCheck and hasForceField(player) then return false end
     if Config.VehicleCheck and isInVehicle(player) then return false end
     if Config.TeamCheck and player.Team == LocalPlayer.Team then return false end
-    if Config.CriminalsNoInmates then
-        if LocalPlayer.Team == Criminals and player.Team == Inmates then return false end
-    end
-    if Config.InmatesNoCriminals then
-        if LocalPlayer.Team == Inmates and player.Team == Criminals then return false end
-    end
-    
-    if Config.HostileCheck or Config.TrespassCheck then
-        local isTaser = currentGun and currentGun:GetAttribute("Projectile") == "Taser"
-        local bypassHostile = Config.TaserBypassHostile and isTaser
-        local bypassTrespass = Config.TaserBypassTrespass and isTaser
-        local targetChar = player.Character
-        
-        if LocalPlayer.Team == Guards and player.Team == Inmates then
-            local hostile = targetChar:GetAttribute("Hostile")
-            local trespass = targetChar:GetAttribute("Trespassing")
-            
-            if Config.HostileCheck and Config.TrespassCheck then
-                if not bypassHostile and not bypassTrespass then
-                    if not hostile and not trespass then return false end
-                end
-            elseif Config.HostileCheck and not bypassHostile then
-                if not hostile then return false end
-            elseif Config.TrespassCheck and not bypassTrespass then
-                if not trespass then return false end
-            end
-        end
-    end
+    if Config.CriminalsNoInmates and LocalPlayer.Team == Criminals and player.Team == Inmates then return false end
+    if Config.InmatesNoCriminals and LocalPlayer.Team == Inmates and player.Team == Criminals then return false end
     return true
 end
 
@@ -429,6 +1079,79 @@ local function fullCheck(player)
         end
     end
     return true
+end
+
+local function getTarget()
+    if not Config.Enabled then return nil, nil end
+    
+    local camera = Camera
+    if not camera then return nil, nil end
+    
+    local aimPos = Camera.ViewportSize / 2
+    local now = os.clock()
+    local fovRadius = Config.FOV
+    
+    if Config.TargetStickiness and currentTarget and (now - targetSwitchTime) < currentStickiness then
+        if fullCheck(currentTarget) then
+            local part = getTargetPart(currentTarget.Character)
+            if part then
+                local screenPos, onScreen = camera:WorldToViewportPoint(part.Position)
+                if onScreen and screenPos.Z > 0 then
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - aimPos).Magnitude
+                    if dist < fovRadius then
+                        lastValidTarget = currentTarget
+                        lastTargetPos = part.Position
+                        targetSmoothTime = now
+                        return currentTarget, part.Position
+                    end
+                end
+            end
+        end
+    end
+    
+    local bestTarget = nil
+    local bestDist = fovRadius
+    local bestPos = nil
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if quickCheck(player) then
+            local part = getTargetPart(player.Character)
+            if part then
+                local screenPos, onScreen = camera:WorldToViewportPoint(part.Position)
+                if onScreen and screenPos.Z > 0 then
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - aimPos).Magnitude
+                    if dist < bestDist then
+                        if fullCheck(player) then
+                            bestDist = dist
+                            bestTarget = player
+                            bestPos = part.Position
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    if bestTarget then
+        if bestTarget ~= currentTarget then
+            currentTarget = bestTarget
+            targetSwitchTime = now
+            if Config.TargetStickinessRandom then
+                currentStickiness = rng:NextNumber(Config.TargetStickinessMin, Config.TargetStickinessMax)
+            else
+                currentStickiness = Config.TargetStickinessDuration
+            end
+        end
+        
+        lastValidTarget = bestTarget
+        lastTargetPos = bestPos
+        targetSmoothTime = now
+        
+        return bestTarget, bestPos
+    end
+    
+    currentTarget = nil
+    return nil, nil
 end
 
 local function rollHit()
@@ -453,74 +1176,6 @@ local function getMissPos(targetPos)
     local d = rng:NextNumber() * spread
     local yOffset = (rng:NextNumber() - 0.5) * spread
     return targetPos + Vector3.new(math.cos(angle) * d, yOffset, math.sin(angle) * d)
-end
-
-local function getClosest(fovRadius)
-    fovRadius = fovRadius or Config.FOV
-    local camera = Workspace.CurrentCamera
-    if not camera then return nil, nil end
-    
-    local aimPos = Camera.ViewportSize / 2
-    local now = os.clock()
-    
-    if Config.TargetStickiness and currentTarget and (now - targetSwitchTime) < currentStickiness then
-        if fullCheck(currentTarget) then
-            local part = getTargetPart(currentTarget.Character)
-            if part then
-                local screenPos, onScreen = camera:WorldToViewportPoint(part.Position)
-                if onScreen and screenPos.Z > 0 then
-                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - aimPos).Magnitude
-                    if dist < fovRadius then
-                        return currentTarget, part.Position
-                    end
-                end
-            end
-        end
-    end
-    
-    local candidates = {}
-    
-    for _, player in ipairs(Players:GetPlayers()) do
-        if quickCheck(player) then
-            local part = getTargetPart(player.Character)
-            if part then
-                local screenPos, onScreen = camera:WorldToViewportPoint(part.Position)
-                if onScreen and screenPos.Z > 0 then
-                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - aimPos).Magnitude
-                    if dist < fovRadius then
-                        candidates[#candidates + 1] = {player = player, dist = dist, part = part}
-                    end
-                end
-            end
-        end
-    end
-    
-    if Config.PrioritizeClosest then
-        table.sort(candidates, function(a, b) return a.dist < b.dist end)
-    else
-        for i = #candidates, 2, -1 do
-            local j = rng:NextInteger(1, i)
-            candidates[i], candidates[j] = candidates[j], candidates[i]
-        end
-    end
-    
-    for _, candidate in ipairs(candidates) do
-        if fullCheck(candidate.player) then
-            if candidate.player ~= currentTarget then
-                currentTarget = candidate.player
-                targetSwitchTime = now
-                if Config.TargetStickinessRandom then
-                    currentStickiness = rng:NextNumber(Config.TargetStickinessMin, Config.TargetStickinessMax)
-                else
-                    currentStickiness = Config.TargetStickinessDuration
-                end
-            end
-            return candidate.player, candidate.part.Position
-        end
-    end
-    
-    currentTarget = nil
-    return nil, nil
 end
 
 local function getGun()
@@ -549,7 +1204,7 @@ local function autoShoot()
     local myHead = myChar:FindFirstChild("Head")
     if not myHead then return end
     
-    local target, targetPos = getClosest(Config.FOV)
+    local target, targetPos = getTarget()
     if not target or not fullCheck(target) then 
         lastAutoTarget = nil
         return 
@@ -605,7 +1260,6 @@ local function autoShoot()
     
     local newAmmo = ammo - 1
     currentGun:SetAttribute("Local_CurrentAmmo", newAmmo)
-    lastAutoShoot = now
 end
 
 local function noUpvals(fn)
@@ -626,9 +1280,9 @@ local function setupHook()
     origCastRay = hookfunction(castRayFunc, noUpvals(function(startPos, targetPos, ...)
         if not Config.Enabled then return origCastRay(startPos, targetPos, ...) end
         
-        local closest, closestPos = getClosest(Config.FOV)
+        local target, targetPos = getTarget()
         
-        if closest and closest.Character then
+        if target and target.Character then
             local isTaser = currentGun and currentGun:GetAttribute("Projectile") == "Taser"
             local isShotgun = currentGun and currentGun:GetAttribute("IsShotgun")
             local shouldHit = false
@@ -637,24 +1291,16 @@ local function setupHook()
                 return origCastRay(startPos, targetPos, ...)
             end
             
-            if Config.ShotgunGameHandled and isShotgun then
-                local targetPart = getTargetPart(closest.Character)
-                if targetPart then
-                    return origCastRay(startPos, targetPart.Position, ...)
-                end
-                return origCastRay(startPos, targetPos, ...)
-            end
-            
             if Config.TaserAlwaysHit and isTaser then
                 shouldHit = true
-            elseif Config.IfPlayerStill and isStanding(closest) then
+            elseif Config.IfPlayerStill and isStanding(target) then
                 shouldHit = true
             else
                 shouldHit = rollHit()
             end
             
             if shouldHit then
-                local targetPart = getTargetPart(closest.Character)
+                local targetPart = getTargetPart(target.Character)
                 if targetPart then
                     if Config.ShotgunNaturalSpread and isShotgun then
                         return origCastRay(startPos, targetPart.Position, ...)
@@ -663,13 +1309,12 @@ local function setupHook()
                 end
             else
                 if Config.MissSpread > 0 then
-                    local targetPart = getTargetPart(closest.Character)
+                    local targetPart = getTargetPart(target.Character)
                     if targetPart then
                         local missPos = getMissPos(targetPart.Position)
                         return origCastRay(startPos, missPos, ...)
                     end
                 end
-                return origCastRay(startPos, targetPos, ...)
             end
         end
         
@@ -678,7 +1323,7 @@ local function setupHook()
     return true
 end
 
--- Main Loops
+-- ============= MAIN LOOP =============
 RunService.Heartbeat:Connect(function()
     currentGun = getGun()
     if currentGun ~= lastGun then
@@ -697,9 +1342,23 @@ RunService.RenderStepped:Connect(function()
     end
     
     if Config.ShowTargetLine and Config.Enabled then
-        local target, targetPos = getClosest()
-        if target and targetPos and Workspace.CurrentCamera then
-            local screenPos, onScreen = Workspace.CurrentCamera:WorldToViewportPoint(targetPos)
+        local target, targetPos = getTarget()
+        
+        if not target and lastValidTarget and (os.clock() - targetSmoothTime) < targetSmoothDelay then
+            if lastTargetPos then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(lastTargetPos)
+                if onScreen then
+                    targetLine.From = Camera.ViewportSize / 2
+                    targetLine.To = Vector2.new(screenPos.X, screenPos.Y)
+                    targetLine.Visible = true
+                else
+                    targetLine.Visible = false
+                end
+            else
+                targetLine.Visible = false
+            end
+        elseif target and targetPos then
+            local screenPos, onScreen = Camera:WorldToViewportPoint(targetPos)
             if onScreen then
                 targetLine.From = Camera.ViewportSize / 2
                 targetLine.To = Vector2.new(screenPos.X, screenPos.Y)
@@ -712,6 +1371,20 @@ RunService.RenderStepped:Connect(function()
         end
     else
         targetLine.Visible = false
+    end
+    
+    updateESP()
+end)
+
+-- Player cleanup
+Players.PlayerRemoving:Connect(function(player)
+    if ESP.Objects[player] then
+        ESP.Objects[player].Box:Remove()
+        ESP.Objects[player].Name:Remove()
+        ESP.Objects[player].Health:Remove()
+        ESP.Objects[player].Distance:Remove()
+        ESP.Objects[player].Tracer:Remove()
+        ESP.Objects[player] = nil
     end
 end)
 
@@ -745,6 +1418,6 @@ end)
 -- Notification
 StarterGui:SetCore("SendNotification", {
     Title = "Arc Client",
-    Text = "Combat Edition Loaded",
-    Duration = 3
+    Text = "Elite Edition Loaded - Type .help in chat",
+    Duration = 5
 })
