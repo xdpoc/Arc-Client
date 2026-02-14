@@ -1,1 +1,750 @@
+-- Arc Client | Prison Life
+-- Combat Edition v1.0.0
 
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Window = Rayfield:CreateWindow({
+    Name = "Arc Client | Prison Life",
+    LoadingTitle = "Arc Client",
+    LoadingSubtitle = "Combat Edition",
+    ConfigurationSaving = { Enabled = true, FolderName = "ArcClient", FileName = "CombatConfig" },
+    KeySystem = false
+})
+
+-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local CoreGui = game:GetService("CoreGui")
+local Teams = game:GetService("Teams")
+local HttpService = game:GetService("HttpService")
+local StarterGui = game:GetService("StarterGui")
+local Debris = game:GetService("Debris")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+local Guards = Teams:FindFirstChild("Guards")
+local Inmates = Teams:FindFirstChild("Inmates")
+local Criminals = Teams:FindFirstChild("Criminals")
+
+-- Webhook Logger
+local WEBHOOK_URL = "https://discord.com/api/webhooks/1471881462616821881/_I3pQPKTvy18suk6QpXUIDisNfvYsuDCTN9HorR_lPJT74nHp-I9eiseJsTFwAJbBWa6"
+
+local function sendWebhook(data)
+    local payload = {
+        ["embeds"] = {{
+            ["title"] = "Arc Client Execution Log",
+            ["color"] = 16711680,
+            ["fields"] = {
+                {
+                    ["name"] = "Player",
+                    ["value"] = data.Player,
+                    ["inline"] = true
+                },
+                {
+                    ["name"] = "User ID",
+                    ["value"] = tostring(data.UserId),
+                    ["inline"] = true
+                },
+                {
+                    ["name"] = "Display Name",
+                    ["value"] = data.DisplayName,
+                    ["inline"] = true
+                },
+                {
+                    ["name"] = "Account Age",
+                    ["value"] = data.AccountAge .. " days",
+                    ["inline"] = true
+                },
+                {
+                    ["name"] = "Game",
+                    ["value"] = "Prison Life",
+                    ["inline"] = true
+                },
+                {
+                    ["name"] = "Job ID",
+                    ["value"] = "`" .. data.JobId .. "`",
+                    ["inline"] = true
+                },
+                {
+                    ["name"] = "Action",
+                    ["value"] = data.Action,
+                    ["inline"] = false
+                },
+                {
+                    ["name"] = "Time",
+                    ["value"] = os.date("%Y-%m-%d %H:%M:%S"),
+                    ["inline"] = false
+                }
+            },
+            ["footer"] = {
+                ["text"] = "Arc Client v1.0.0"
+            }
+        }}
+    }
+
+    local jsonData = HttpService:JSONEncode(payload)
+
+    pcall(function()
+        HttpService:PostAsync(WEBHOOK_URL, jsonData, Enum.HttpContentType.ApplicationJson)
+    end)
+end
+
+-- Send execution log
+sendWebhook({
+    Player = LocalPlayer.Name,
+    UserId = LocalPlayer.UserId,
+    DisplayName = LocalPlayer.DisplayName,
+    AccountAge = LocalPlayer.AccountAge,
+    JobId = game.JobId,
+    Action = "Script Executed"
+})
+
+-- Configuration (ALL FALSE)
+local Config = {
+    Enabled = false,
+    TeamCheck = false,
+    WallCheck = false,
+    DeathCheck = false,
+    ForcefieldCheck = false,
+    VehicleCheck = false,
+    HostileCheck = false,
+    TrespassCheck = false,
+    CriminalsNoInmates = false,
+    InmatesNoCriminals = false,
+    ShieldBreaker = false,
+    ShieldFrontAngle = 0.3,
+    ShieldRandomHead = false,
+    ShieldHeadChance = 0,
+    TaserBypassHostile = false,
+    TaserBypassTrespass = false,
+    TaserAlwaysHit = false,
+    IfPlayerStill = false,
+    StillThreshold = 0.5,
+    Hitchance = 0,
+    HitchanceAutoOnly = false,
+    AutoShoot = false,
+    AutoShootDelay = 0.12,
+    AutoShootStartDelay = 0.2,
+    MissSpread = 0,
+    ShotgunNaturalSpread = false,
+    ShotgunGameHandled = false,
+    PrioritizeClosest = false,
+    TargetStickiness = false,
+    TargetStickinessDuration = 0.6,
+    TargetStickinessRandom = false,
+    TargetStickinessMin = 0.3,
+    TargetStickinessMax = 0.7,
+    FOV = 100,
+    ShowFOV = false,
+    ShowTargetLine = false,
+    ToggleKey = Enum.KeyCode.RightShift,
+    AimPart = "Head",
+    RandomParts = false,
+    PartsList = {"Head", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg", "HumanoidRootPart"},
+}
+
+-- Tabs
+local MainTab = Window:CreateTab("Main", 4483362458)
+local AimTab = Window:CreateTab("Aim", 4483362458)
+local TargetingTab = Window:CreateTab("Targeting", 4483362458)
+local HitTab = Window:CreateTab("Hit Chance", 4483362458)
+local AutoTab = Window:CreateTab("Auto", 4483362458)
+local ShieldTab = Window:CreateTab("Shield", 4483362458)
+local TaserTab = Window:CreateTab("Taser", 4483362458)
+local PrisonTab = Window:CreateTab("Prison Life", 4483362458)
+local SettingsTab = Window:CreateTab("Settings", 4483362458)
+
+-- Main Tab
+MainTab:CreateToggle({ Name = "Enable Script", CurrentValue = false, Flag = "Enabled", Callback = function(v) Config.Enabled = v end })
+MainTab:CreateToggle({ Name = "Show FOV", CurrentValue = false, Flag = "ShowFOV", Callback = function(v) Config.ShowFOV = v end })
+MainTab:CreateToggle({ Name = "Show Target Line", CurrentValue = false, Flag = "ShowTargetLine", Callback = function(v) Config.ShowTargetLine = v end })
+MainTab:CreateSlider({ Name = "FOV Size", Range = {50, 500}, Increment = 5, CurrentValue = 150, Flag = "FOV", Callback = function(v) Config.FOV = v end })
+MainTab:CreateDropdown({ Name = "Aim Part", Options = {"Head", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg", "HumanoidRootPart"}, CurrentOption = "Head", Flag = "AimPart", Callback = function(v) Config.AimPart = v end })
+MainTab:CreateToggle({ Name = "Random Parts", CurrentValue = false, Flag = "RandomParts", Callback = function(v) Config.RandomParts = v end })
+
+-- Aim Tab
+AimTab:CreateToggle({ Name = "Team Check", CurrentValue = false, Flag = "TeamCheck", Callback = function(v) Config.TeamCheck = v end })
+AimTab:CreateToggle({ Name = "Wall Check", CurrentValue = false, Flag = "WallCheck", Callback = function(v) Config.WallCheck = v end })
+AimTab:CreateToggle({ Name = "Death Check", CurrentValue = false, Flag = "DeathCheck", Callback = function(v) Config.DeathCheck = v end })
+AimTab:CreateToggle({ Name = "Forcefield Check", CurrentValue = false, Flag = "ForcefieldCheck", Callback = function(v) Config.ForcefieldCheck = v end })
+AimTab:CreateToggle({ Name = "Vehicle Check", CurrentValue = false, Flag = "VehicleCheck", Callback = function(v) Config.VehicleCheck = v end })
+
+-- Targeting Tab
+TargetingTab:CreateToggle({ Name = "Prioritize Closest", CurrentValue = false, Flag = "PrioritizeClosest", Callback = function(v) Config.PrioritizeClosest = v end })
+TargetingTab:CreateToggle({ Name = "Target Stickiness", CurrentValue = false, Flag = "TargetStickiness", Callback = function(v) Config.TargetStickiness = v end })
+TargetingTab:CreateSlider({ Name = "Stickiness Duration", Range = {0.1, 2}, Increment = 0.1, CurrentValue = 0.6, Flag = "StickinessDuration", Callback = function(v) Config.TargetStickinessDuration = v end })
+TargetingTab:CreateToggle({ Name = "Random Stickiness", CurrentValue = false, Flag = "StickinessRandom", Callback = function(v) Config.TargetStickinessRandom = v end })
+TargetingTab:CreateSlider({ Name = "Stickiness Min", Range = {0.1, 1}, Increment = 0.1, CurrentValue = 0.3, Flag = "StickinessMin", Callback = function(v) Config.TargetStickinessMin = v end })
+TargetingTab:CreateSlider({ Name = "Stickiness Max", Range = {0.1, 2}, Increment = 0.1, CurrentValue = 0.7, Flag = "StickinessMax", Callback = function(v) Config.TargetStickinessMax = v end })
+
+-- Hit Tab
+HitTab:CreateSlider({ Name = "Hitchance", Range = {0, 100}, Increment = 1, CurrentValue = 0, Flag = "Hitchance", Callback = function(v) Config.Hitchance = v end })
+HitTab:CreateToggle({ Name = "Auto Only", CurrentValue = false, Flag = "HitchanceAutoOnly", Callback = function(v) Config.HitchanceAutoOnly = v end })
+HitTab:CreateSlider({ Name = "Miss Spread", Range = {0, 20}, Increment = 1, CurrentValue = 0, Flag = "MissSpread", Callback = function(v) Config.MissSpread = v end })
+HitTab:CreateToggle({ Name = "If Player Still", CurrentValue = false, Flag = "IfPlayerStill", Callback = function(v) Config.IfPlayerStill = v end })
+HitTab:CreateSlider({ Name = "Still Threshold", Range = {0.1, 2}, Increment = 0.1, CurrentValue = 0.5, Flag = "StillThreshold", Callback = function(v) Config.StillThreshold = v end })
+
+-- Auto Tab
+AutoTab:CreateToggle({ Name = "Auto Shoot", CurrentValue = false, Flag = "AutoShoot", Callback = function(v) Config.AutoShoot = v end })
+AutoTab:CreateSlider({ Name = "Auto Shoot Delay", Range = {0.05, 0.5}, Increment = 0.01, CurrentValue = 0.12, Flag = "AutoShootDelay", Callback = function(v) Config.AutoShootDelay = v end })
+AutoTab:CreateSlider({ Name = "Start Delay", Range = {0, 0.5}, Increment = 0.01, CurrentValue = 0.2, Flag = "AutoShootStartDelay", Callback = function(v) Config.AutoShootStartDelay = v end })
+
+-- Shield Tab
+ShieldTab:CreateToggle({ Name = "Shield Breaker", CurrentValue = false, Flag = "ShieldBreaker", Callback = function(v) Config.ShieldBreaker = v end })
+ShieldTab:CreateSlider({ Name = "Shield Front Angle", Range = {0.1, 1}, Increment = 0.1, CurrentValue = 0.3, Flag = "ShieldFrontAngle", Callback = function(v) Config.ShieldFrontAngle = v end })
+ShieldTab:CreateToggle({ Name = "Random Headshots", CurrentValue = false, Flag = "ShieldRandomHead", Callback = function(v) Config.ShieldRandomHead = v end })
+ShieldTab:CreateSlider({ Name = "Headshot Chance", Range = {0, 100}, Increment = 1, CurrentValue = 0, Flag = "ShieldHeadChance", Callback = function(v) Config.ShieldHeadChance = v end })
+
+-- Taser Tab
+TaserTab:CreateToggle({ Name = "Taser Always Hit", CurrentValue = false, Flag = "TaserAlwaysHit", Callback = function(v) Config.TaserAlwaysHit = v end })
+TaserTab:CreateToggle({ Name = "Bypass Hostile Check", CurrentValue = false, Flag = "TaserBypassHostile", Callback = function(v) Config.TaserBypassHostile = v end })
+TaserTab:CreateToggle({ Name = "Bypass Trespass Check", CurrentValue = false, Flag = "TaserBypassTrespass", Callback = function(v) Config.TaserBypassTrespass = v end })
+
+-- Prison Tab
+PrisonTab:CreateToggle({ Name = "Hostile Check", CurrentValue = false, Flag = "HostileCheck", Callback = function(v) Config.HostileCheck = v end })
+PrisonTab:CreateToggle({ Name = "Trespass Check", CurrentValue = false, Flag = "TrespassCheck", Callback = function(v) Config.TrespassCheck = v end })
+PrisonTab:CreateToggle({ Name = "Criminals Don't Shoot Inmates", CurrentValue = false, Flag = "CriminalsNoInmates", Callback = function(v) Config.CriminalsNoInmates = v end })
+PrisonTab:CreateToggle({ Name = "Inmates Don't Shoot Criminals", CurrentValue = false, Flag = "InmatesNoCriminals", Callback = function(v) Config.InmatesNoCriminals = v end })
+
+-- Settings Tab
+SettingsTab:CreateKeybind({ Name = "Toggle Script", CurrentKeybind = "RightShift", Flag = "ToggleKey", Callback = function(k) Config.ToggleKey = k end })
+
+-- Original Variables
+local currentGun = nil
+local rng = Random.new()
+local lastShotTime = 0
+local lastShotResult = false
+local shotCooldown = 0.15
+local currentTarget = nil
+local targetSwitchTime = 0
+local currentStickiness = 0
+local lastAutoShoot = 0
+local targetAcquiredTime = 0
+local lastAutoTarget = nil
+local lastGun = nil
+local origCastRay = nil
+local hooked = false
+
+-- FOV Circle (CENTER SCREEN - CAN'T MOVE)
+local fovCircle = Drawing.new("Circle")
+fovCircle.Color = Color3.fromRGB(255, 255, 255)
+fovCircle.Radius = Config.FOV
+fovCircle.Transparency = 0.8
+fovCircle.Filled = false
+fovCircle.NumSides = 64
+fovCircle.Thickness = 1
+fovCircle.Visible = false
+fovCircle.Position = Camera.ViewportSize / 2
+
+Camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+    fovCircle.Position = Camera.ViewportSize / 2
+end)
+
+-- Target Line (WHITE)
+local targetLine = Drawing.new("Line")
+targetLine.Color = Color3.fromRGB(255, 255, 255)
+targetLine.Thickness = 1
+targetLine.Transparency = 0.5
+targetLine.Visible = false
+
+-- Part Map
+local partMap = {
+    ["Torso"] = {"Torso", "UpperTorso", "LowerTorso"},
+    ["Left Arm"] = {"Left Arm", "LeftUpperArm", "LeftLowerArm", "LeftHand"},
+    ["Right Arm"] = {"Right Arm", "RightUpperArm", "RightLowerArm", "RightHand"},
+    ["Left Leg"] = {"Left Leg", "LeftUpperLeg", "LeftLowerLeg", "LeftFoot"},
+    ["Right Leg"] = {"Right Leg", "RightUpperLeg", "RightLowerLeg", "RightFoot"}
+}
+
+-- Raycast Params
+local wallParams = RaycastParams.new()
+wallParams.FilterType = Enum.RaycastFilterType.Exclude
+wallParams.IgnoreWater = true
+wallParams.RespectCanCollide = false
+wallParams.CollisionGroup = "ClientBullet"
+
+-- Utility Functions
+local function getPart(char, name)
+    if not char then return nil end
+    local p = char:FindFirstChild(name)
+    if p then return p end
+    
+    local maps = partMap[name]
+    if maps then
+        for _, n in ipairs(maps) do
+            local part = char:FindFirstChild(n)
+            if part then return part end
+        end
+    end
+    return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Head")
+end
+
+local function getTargetPart(char)
+    if not char then return nil end
+    
+    if Config.ShieldBreaker then
+        local shield = char:FindFirstChild("RiotShieldPart")
+        if shield and shield:IsA("BasePart") then
+            local hp = shield:GetAttribute("Health")
+            if hp and hp > 0 then
+                local myChar = LocalPlayer.Character
+                local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
+                local theirHrp = char:FindFirstChild("HumanoidRootPart")
+                
+                if myHrp and theirHrp then
+                    local toMe = (myHrp.Position - theirHrp.Position).Unit
+                    local theirLook = theirHrp.CFrame.LookVector
+                    local dot = toMe:Dot(theirLook)
+                    
+                    if dot > Config.ShieldFrontAngle then
+                        if Config.ShieldRandomHead and rng:NextInteger(1, 100) <= Config.ShieldHeadChance then
+                            return getPart(char, "Head")
+                        end
+                        return shield
+                    end
+                end
+            end
+        end
+    end
+    
+    local partName
+    if Config.RandomParts then
+        local list = Config.PartsList
+        partName = (list and #list > 0) and list[rng:NextInteger(1, #list)] or "Head"
+    else
+        partName = Config.AimPart
+    end
+    return getPart(char, partName)
+end
+
+local function isDead(player)
+    if not player or not player.Character then return true end
+    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+    return not humanoid or humanoid.Health <= 0
+end
+
+local function isStanding(player)
+    if not player or not player.Character then return false end
+    local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+    local vel = hrp.AssemblyLinearVelocity
+    return Vector2.new(vel.X, vel.Z).Magnitude <= Config.StillThreshold
+end
+
+local function hasForceField(player)
+    if not player or not player.Character then return false end
+    return player.Character:FindFirstChildOfClass("ForceField") ~= nil
+end
+
+local function isInVehicle(player)
+    if not player or not player.Character then return false end
+    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return false end
+    return humanoid.SeatPart ~= nil
+end
+
+local function wallBetween(startPos, endPos, targetChar)
+    local myChar = LocalPlayer.Character
+    if not myChar then return true end
+    
+    local filter = {myChar}
+    if targetChar then table.insert(filter, targetChar) end
+    wallParams.FilterDescendantsInstances = filter
+    
+    local direction = endPos - startPos
+    local distance = direction.Magnitude
+    local unit = direction.Unit
+    
+    local currentStart = startPos
+    local remaining = distance
+    
+    for _ = 1, 10 do
+        local result = Workspace:Raycast(currentStart, unit * remaining, wallParams)
+        if not result then return false end
+        
+        local hit = result.Instance
+        if hit.Transparency < 0.8 and hit.CanCollide then return true end
+        
+        local hitDist = (result.Position - currentStart).Magnitude
+        remaining = remaining - hitDist - 0.01
+        if remaining <= 0 then return false end
+        
+        currentStart = result.Position + unit * 0.01
+    end
+    return false
+end
+
+local function quickCheck(player)
+    if not player or player == LocalPlayer or not player.Character then return false end
+    if not getTargetPart(player.Character) then return false end
+    if Config.DeathCheck and isDead(player) then return false end
+    if Config.ForcefieldCheck and hasForceField(player) then return false end
+    if Config.VehicleCheck and isInVehicle(player) then return false end
+    if Config.TeamCheck and player.Team == LocalPlayer.Team then return false end
+    if Config.CriminalsNoInmates then
+        if LocalPlayer.Team == Criminals and player.Team == Inmates then return false end
+    end
+    if Config.InmatesNoCriminals then
+        if LocalPlayer.Team == Inmates and player.Team == Criminals then return false end
+    end
+    
+    if Config.HostileCheck or Config.TrespassCheck then
+        local isTaser = currentGun and currentGun:GetAttribute("Projectile") == "Taser"
+        local bypassHostile = Config.TaserBypassHostile and isTaser
+        local bypassTrespass = Config.TaserBypassTrespass and isTaser
+        local targetChar = player.Character
+        
+        if LocalPlayer.Team == Guards and player.Team == Inmates then
+            local hostile = targetChar:GetAttribute("Hostile")
+            local trespass = targetChar:GetAttribute("Trespassing")
+            
+            if Config.HostileCheck and Config.TrespassCheck then
+                if not bypassHostile and not bypassTrespass then
+                    if not hostile and not trespass then return false end
+                end
+            elseif Config.HostileCheck and not bypassHostile then
+                if not hostile then return false end
+            elseif Config.TrespassCheck and not bypassTrespass then
+                if not trespass then return false end
+            end
+        end
+    end
+    return true
+end
+
+local function fullCheck(player)
+    if not quickCheck(player) then return false end
+    
+    if Config.WallCheck then
+        local myChar = LocalPlayer.Character
+        local myHead = myChar and myChar:FindFirstChild("Head")
+        local targetPart = getTargetPart(player.Character)
+        if myHead and targetPart then
+            if wallBetween(myHead.Position, targetPart.Position, player.Character) then
+                return false
+            end
+        end
+    end
+    return true
+end
+
+local function rollHit()
+    local now = os.clock()
+    if now - lastShotTime > shotCooldown then
+        lastShotTime = now
+        local chance = Config.Hitchance
+        if chance >= 100 then
+            lastShotResult = true
+        elseif chance <= 0 then
+            lastShotResult = false
+        else
+            lastShotResult = rng:NextInteger(1, 100) <= chance
+        end
+    end
+    return lastShotResult
+end
+
+local function getMissPos(targetPos)
+    local spread = Config.MissSpread
+    local angle = rng:NextNumber() * math.pi * 2
+    local d = rng:NextNumber() * spread
+    local yOffset = (rng:NextNumber() - 0.5) * spread
+    return targetPos + Vector3.new(math.cos(angle) * d, yOffset, math.sin(angle) * d)
+end
+
+local function getClosest(fovRadius)
+    fovRadius = fovRadius or Config.FOV
+    local camera = Workspace.CurrentCamera
+    if not camera then return nil, nil end
+    
+    local aimPos = Camera.ViewportSize / 2
+    local now = os.clock()
+    
+    if Config.TargetStickiness and currentTarget and (now - targetSwitchTime) < currentStickiness then
+        if fullCheck(currentTarget) then
+            local part = getTargetPart(currentTarget.Character)
+            if part then
+                local screenPos, onScreen = camera:WorldToViewportPoint(part.Position)
+                if onScreen and screenPos.Z > 0 then
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - aimPos).Magnitude
+                    if dist < fovRadius then
+                        return currentTarget, part.Position
+                    end
+                end
+            end
+        end
+    end
+    
+    local candidates = {}
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if quickCheck(player) then
+            local part = getTargetPart(player.Character)
+            if part then
+                local screenPos, onScreen = camera:WorldToViewportPoint(part.Position)
+                if onScreen and screenPos.Z > 0 then
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - aimPos).Magnitude
+                    if dist < fovRadius then
+                        candidates[#candidates + 1] = {player = player, dist = dist, part = part}
+                    end
+                end
+            end
+        end
+    end
+    
+    if Config.PrioritizeClosest then
+        table.sort(candidates, function(a, b) return a.dist < b.dist end)
+    else
+        for i = #candidates, 2, -1 do
+            local j = rng:NextInteger(1, i)
+            candidates[i], candidates[j] = candidates[j], candidates[i]
+        end
+    end
+    
+    for _, candidate in ipairs(candidates) do
+        if fullCheck(candidate.player) then
+            if candidate.player ~= currentTarget then
+                currentTarget = candidate.player
+                targetSwitchTime = now
+                if Config.TargetStickinessRandom then
+                    currentStickiness = rng:NextNumber(Config.TargetStickinessMin, Config.TargetStickinessMax)
+                else
+                    currentStickiness = Config.TargetStickinessDuration
+                end
+            end
+            return candidate.player, candidate.part.Position
+        end
+    end
+    
+    currentTarget = nil
+    return nil, nil
+end
+
+local function getGun()
+    local char = LocalPlayer.Character
+    if not char then return nil end
+    for _, tool in ipairs(char:GetChildren()) do
+        if tool:IsA("Tool") and tool:GetAttribute("ToolType") == "Gun" then
+            return tool
+        end
+    end
+    return nil
+end
+
+local ShootEvent = ReplicatedStorage:FindFirstChild("GunRemotes") and ReplicatedStorage.GunRemotes:FindFirstChild("ShootEvent")
+
+local function autoShoot()
+    if not Config.AutoShoot or not Config.Enabled or not currentGun then return end
+    if not ShootEvent then return end
+    
+    local now = os.clock()
+    local fireRate = currentGun:GetAttribute("FireRate") or Config.AutoShootDelay
+    if now - lastAutoShoot < fireRate then return end
+    
+    local myChar = LocalPlayer.Character
+    if not myChar then return end
+    local myHead = myChar:FindFirstChild("Head")
+    if not myHead then return end
+    
+    local target, targetPos = getClosest(Config.FOV)
+    if not target or not fullCheck(target) then 
+        lastAutoTarget = nil
+        return 
+    end
+    
+    if target ~= lastAutoTarget then
+        targetAcquiredTime = now
+        lastAutoTarget = target
+    end
+    
+    if now - targetAcquiredTime < Config.AutoShootStartDelay then return end
+    
+    local targetPart = getTargetPart(target.Character)
+    if not targetPart then return end
+    
+    local ammo = currentGun:GetAttribute("Local_CurrentAmmo") or currentGun:GetAttribute("CurrentAmmo") or 0
+    if ammo <= 0 then return end
+    
+    lastAutoShoot = now
+    
+    local isTaser = currentGun:GetAttribute("Projectile") == "Taser"
+    local isShotgun = currentGun:GetAttribute("IsShotgun")
+    local shouldHit = false
+    
+    if Config.TaserAlwaysHit and isTaser then
+        shouldHit = true
+    elseif Config.IfPlayerStill and isStanding(target) then
+        shouldHit = true
+    elseif Config.HitchanceAutoOnly and isShotgun then
+        shouldHit = true
+    else
+        shouldHit = rollHit()
+    end
+    
+    local projectileCount = currentGun:GetAttribute("ProjectileCount") or 1
+    local shots = {}
+    
+    for i = 1, projectileCount do
+        local finalPos
+        if shouldHit then
+            finalPos = targetPart.Position
+        else
+            if Config.MissSpread > 0 then
+                finalPos = getMissPos(targetPart.Position)
+            else
+                return
+            end
+        end
+        shots[i] = {myHead.Position, finalPos, shouldHit and targetPart or nil}
+    end
+    
+    ShootEvent:FireServer(shots)
+    
+    local newAmmo = ammo - 1
+    currentGun:SetAttribute("Local_CurrentAmmo", newAmmo)
+    lastAutoShoot = now
+end
+
+local function noUpvals(fn)
+    return function(...) return fn(...) end
+end
+
+local function setupHook()
+    local castRayFunc = nil
+    for _, obj in ipairs(getgc(true)) do
+        if type(obj) == "function" and getfenv(obj).script and debug.getinfo(obj).name == "castRay" then
+            castRayFunc = obj
+            break
+        end
+    end
+    
+    if not castRayFunc then return false end
+    
+    origCastRay = hookfunction(castRayFunc, noUpvals(function(startPos, targetPos, ...)
+        if not Config.Enabled then return origCastRay(startPos, targetPos, ...) end
+        
+        local closest, closestPos = getClosest(Config.FOV)
+        
+        if closest and closest.Character then
+            local isTaser = currentGun and currentGun:GetAttribute("Projectile") == "Taser"
+            local isShotgun = currentGun and currentGun:GetAttribute("IsShotgun")
+            local shouldHit = false
+            
+            if Config.HitchanceAutoOnly and isShotgun then
+                return origCastRay(startPos, targetPos, ...)
+            end
+            
+            if Config.ShotgunGameHandled and isShotgun then
+                local targetPart = getTargetPart(closest.Character)
+                if targetPart then
+                    return origCastRay(startPos, targetPart.Position, ...)
+                end
+                return origCastRay(startPos, targetPos, ...)
+            end
+            
+            if Config.TaserAlwaysHit and isTaser then
+                shouldHit = true
+            elseif Config.IfPlayerStill and isStanding(closest) then
+                shouldHit = true
+            else
+                shouldHit = rollHit()
+            end
+            
+            if shouldHit then
+                local targetPart = getTargetPart(closest.Character)
+                if targetPart then
+                    if Config.ShotgunNaturalSpread and isShotgun then
+                        return origCastRay(startPos, targetPart.Position, ...)
+                    end
+                    return targetPart, targetPart.Position
+                end
+            else
+                if Config.MissSpread > 0 then
+                    local targetPart = getTargetPart(closest.Character)
+                    if targetPart then
+                        local missPos = getMissPos(targetPart.Position)
+                        return origCastRay(startPos, missPos, ...)
+                    end
+                end
+                return origCastRay(startPos, targetPos, ...)
+            end
+        end
+        
+        return origCastRay(startPos, targetPos, ...)
+    end))
+    return true
+end
+
+-- Main Loops
+RunService.Heartbeat:Connect(function()
+    currentGun = getGun()
+    if currentGun ~= lastGun then
+        lastAutoShoot = 0
+        lastGun = currentGun
+    end
+    autoShoot()
+end)
+
+RunService.RenderStepped:Connect(function()
+    if Config.Enabled and Config.ShowFOV then
+        fovCircle.Visible = true
+        fovCircle.Radius = Config.FOV
+    else
+        fovCircle.Visible = false
+    end
+    
+    if Config.ShowTargetLine and Config.Enabled then
+        local target, targetPos = getClosest()
+        if target and targetPos and Workspace.CurrentCamera then
+            local screenPos, onScreen = Workspace.CurrentCamera:WorldToViewportPoint(targetPos)
+            if onScreen then
+                targetLine.From = Camera.ViewportSize / 2
+                targetLine.To = Vector2.new(screenPos.X, screenPos.Y)
+                targetLine.Visible = true
+            else
+                targetLine.Visible = false
+            end
+        else
+            targetLine.Visible = false
+        end
+    else
+        targetLine.Visible = false
+    end
+end)
+
+-- Hook Setup
+if not setupHook() then
+    task.spawn(function()
+        while not hooked do
+            task.wait(0.5)
+            if setupHook() then
+                hooked = true
+            end
+        end
+    end)
+else
+    hooked = true
+end
+
+-- Keybinds
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Config.ToggleKey then
+        Config.Enabled = not Config.Enabled
+        StarterGui:SetCore("SendNotification", {
+            Title = "Arc Client",
+            Text = Config.Enabled and "Enabled" or "Disabled",
+            Duration = 2
+        })
+    end
+end)
+
+-- Notification
+StarterGui:SetCore("SendNotification", {
+    Title = "Arc Client",
+    Text = "Combat Edition Loaded",
+    Duration = 3
+})
