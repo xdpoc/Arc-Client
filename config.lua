@@ -15,7 +15,7 @@ return {
             ["Delta"] = true,
             ["Potassium"] = true,
             ["Volt"] = true,
-            ["AWP"{ = true,
+            ["AWP"] = true,
             ["Wave"] = true,
             ["SirHurt"] = true,
             ["MacSploit"] = true,
